@@ -1,7 +1,7 @@
 // script.js
 import { app, db } from './firebaseConfig.js';
 import {
-  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   doc, setDoc, getDoc, collection, addDoc, serverTimestamp,
@@ -9,6 +9,8 @@ import {
 
 const LS_OMIKUJI_UID = 'genshinOmikuji_userId';
 const AUTH_EMAIL_SUFFIX = '@uko05.internal';
+// admin/admin.js, firestore.rules と同じ値にすること
+const ADMIN_UID = 'UPInlRxp2eM8OI3p18UU1d3OzNc2';
 
 const auth = getAuth(app);
 
@@ -41,6 +43,7 @@ const i18n = {
     mergeBtn: '申請する',
     mergeContactDesc: '名前を入力せずに占っていた方・上記が当てはまらない方は、下のリンクから直接連絡してください。',
     sadLabel: '＜友達ください…',
+    adminPanelLink: '管理者画面を開く',
 
     msgFillIdPw: 'IDとパスワードを入力してください。',
     msgNeedOmikujiFirst: '先におみくじサイトを一度使ってから登録してください。',
@@ -84,6 +87,7 @@ const i18n = {
     mergeBtn: 'Submit request',
     mergeContactDesc: 'If you drew fortunes without entering a name, or none of the above applies, please contact us directly using the links below.',
     sadLabel: '< Follow me on X!',
+    adminPanelLink: 'Open admin panel',
 
     msgFillIdPw: 'Please enter an ID and password.',
     msgNeedOmikujiFirst: 'Please use the omikuji site once before registering.',
@@ -273,6 +277,12 @@ mergeBtn.addEventListener('click', async () => {
   } finally {
     mergeBtn.disabled = false;
   }
+});
+
+// ===== 管理者ログイン中のみ管理画面リンクを表示 =====
+const adminPanelLink = document.getElementById('admin-panel-link');
+onAuthStateChanged(auth, (user) => {
+  adminPanelLink.classList.toggle('hidden', !(user && user.uid === ADMIN_UID));
 });
 
 initLangSwitch();
