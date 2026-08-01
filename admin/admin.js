@@ -137,13 +137,29 @@ document.getElementById('search-btn').addEventListener('click', async () => {
   if (!value) return;
   searchResultsEl.innerHTML = '検索中…';
 
+  // uid -> { data, viaLoginId }
   const results = new Map();
 
   const byIdSnap = await getDoc(doc(db, 'omikujiUsers', value));
-  if (byIdSnap.exists()) results.set(byIdSnap.id, byIdSnap.data());
+  if (byIdSnap.exists()) results.set(byIdSnap.id, { data: byIdSnap.data(), viaLoginId: null });
 
   const byNameSnap = await getDocs(query(collection(db, 'omikujiUsers'), where('name', '==', value)));
-  byNameSnap.forEach((d) => results.set(d.id, d.data()));
+  byNameSnap.forEach((d) => {
+    if (!results.has(d.id)) results.set(d.id, { data: d.data(), viaLoginId: null });
+  });
+
+  // 登録済みアカウントのID(accountLinks.loginId)からの検索
+  const byLoginIdSnap = await getDocs(query(collection(db, 'accountLinks'), where('loginId', '==', value)));
+  for (const linkDoc of byLoginIdSnap.docs) {
+    const omikujiUserId = linkDoc.data().omikujiUserId;
+    if (!omikujiUserId) continue;
+    if (results.has(omikujiUserId)) {
+      results.get(omikujiUserId).viaLoginId = value;
+      continue;
+    }
+    const userSnap = await getDoc(doc(db, 'omikujiUsers', omikujiUserId));
+    if (userSnap.exists()) results.set(userSnap.id, { data: userSnap.data(), viaLoginId: value });
+  }
 
   if (results.size === 0) {
     searchResultsEl.innerHTML = '該当するユーザーが見つかりませんでした。';
@@ -151,7 +167,7 @@ document.getElementById('search-btn').addEventListener('click', async () => {
   }
 
   searchResultsEl.innerHTML = '';
-  results.forEach((u, id) => {
+  results.forEach(({ data: u, viaLoginId }, id) => {
     const item = document.createElement('div');
     item.className = 'candidate-item';
     item.innerHTML = `
@@ -159,6 +175,7 @@ document.getElementById('search-btn').addEventListener('click', async () => {
         <div><b>UID:</b> ${escapeHtml(id)}</div>
         <div><b>名前:</b> ${escapeHtml(u.name || '(無記名)')}／<b>誕生日:</b> ${escapeHtml(u.birthday || '-')}</div>
         <div><b>アチーブ数:</b> ${(u.achievements || []).length}</div>
+        ${viaLoginId ? `<div><b>登録ID:</b> ${escapeHtml(viaLoginId)} で一致</div>` : ''}
       </div>
       <button class="primary-btn" style="width:auto; padding:8px 16px;" data-action="edit">編集</button>
     `;
