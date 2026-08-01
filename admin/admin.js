@@ -192,8 +192,8 @@ function renderAccounts(filterText) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th>名前</th><th>登録ID</th><th>UID</th><th>誕生日</th>
-        <th>銅</th><th>銀</th><th>金</th><th>虹(レジェンド)</th><th></th>
+        <th>名前</th><th>登録ID</th><th>誕生日</th>
+        <th>銅</th><th>銀</th><th>金</th><th>虹</th><th></th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -207,7 +207,6 @@ function renderAccounts(filterText) {
     tr.innerHTML = u ? `
       <td>${escapeHtml(u.name || '(無記名)')}</td>
       <td>${escapeHtml(a.loginId)}</td>
-      <td>${escapeHtml(a.omikujiUserId)}</td>
       <td>${escapeHtml(u.birthday || '-')}</td>
       <td>${counts.bronze}</td>
       <td>${counts.silver}</td>
