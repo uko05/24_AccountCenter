@@ -48,6 +48,20 @@ header h1 {
 
 header p { color: var(--muted); font-size: 0.85rem; }
 
+.lang-switch {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 13px;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.lang-switch label { cursor: pointer; margin-left: 6px; }
+
+@media (max-width: 480px) {
+  .lang-switch { position: static; display: block; margin-top: 8px; }
+}
+
 main {
   max-width: 680px;
   margin: 0 auto;

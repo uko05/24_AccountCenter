@@ -18,69 +18,82 @@
 <body>
 
 <header>
-  <h1>✦ アカウント管理 ✦</h1>
-  <p>おみくじ等の記録の確認・引き継ぎはこちらから</p>
+  <h1 data-i18n="pageTitle">アカウント管理</h1>
+  <p data-i18n="headerSub">おみくじ等の記録の確認・引き継ぎはこちらから</p>
+  <div class="lang-switch">
+    <label><input type="radio" name="lang" value="ja" checked> 日本語</label>
+    <label><input type="radio" name="lang" value="en"> English</label>
+  </div>
 </header>
 
 <main>
 
+  <section class="section" id="intro-section">
+    <div class="section-title" data-i18n="introTitle">このページについて（登録は任意です）</div>
+    <p class="section-desc" style="margin-bottom:0;" data-i18n="introDesc">
+      おみくじサイトなどは、これまで通り登録しなくてもすべての機能を使えます。このページが必要になるのは、
+      ①機種変・端末変更をしても今までのデータを引き継ぎたいとき、②今の状態(UID)を確認したいとき、
+      ③次回から自動でデータを引き継げるようにしておきたいとき、の3つです。
+    </p>
+  </section>
+
   <section class="section" id="uid-section">
-    <div class="section-title">現在のUID</div>
-    <p class="section-desc">この端末でおみくじサイトなどを使うと自動的に発行されるIDです。通常はこの値を覚えておく必要はありません。</p>
-    <div class="uid-box" id="current-uid">読み込み中…</div>
+    <div class="section-title" data-i18n="uidTitle">現在のUID</div>
+    <p class="section-desc" data-i18n="uidDesc">この端末でおみくじサイトなどを使うと自動的に発行されるIDです。通常はこの値を覚えておく必要はありません。</p>
+    <div class="uid-box" id="current-uid" data-i18n="uidLoading">読み込み中…</div>
   </section>
 
   <section class="section" id="register-section">
-    <div class="section-title">アカウント登録（任意）</div>
-    <p class="section-desc">ID・パスワードを設定すると、機種変した際もログインするだけで今までのデータを引き継げます。登録しなくても今まで通り使えます。</p>
+    <div class="section-title" data-i18n="registerTitle">アカウント登録（任意）</div>
+    <p class="section-desc" data-i18n="registerDesc">ID・パスワードを設定すると、機種変した際もログインするだけで今までのデータを引き継げます。登録しなくても今まで通り使えます。</p>
     <div class="input-group">
-      <label for="reg-id">ID</label>
-      <input type="text" id="reg-id" autocomplete="username" maxlength="30" placeholder="半角英数字など">
+      <label for="reg-id" data-i18n="labelId">ID</label>
+      <input type="text" id="reg-id" autocomplete="username" maxlength="30" data-i18n-placeholder="idPlaceholder" placeholder="半角英数字など">
     </div>
     <div class="input-group">
-      <label for="reg-pw">パスワード</label>
-      <input type="password" id="reg-pw" autocomplete="new-password" placeholder="6文字以上">
+      <label for="reg-pw" data-i18n="labelPassword">パスワード</label>
+      <input type="password" id="reg-pw" autocomplete="new-password" data-i18n-placeholder="pwPlaceholder" placeholder="6文字以上">
     </div>
-    <button id="register-btn" class="primary-btn">登録する</button>
+    <button id="register-btn" class="primary-btn" data-i18n="registerBtn">登録する</button>
     <p id="register-msg" class="form-msg"></p>
   </section>
 
   <section class="section" id="login-section">
-    <div class="section-title">ログイン</div>
-    <p class="section-desc">登録済みの方はこちら。ログインすると、この端末に今までのデータが引き継がれます。</p>
+    <div class="section-title" data-i18n="loginTitle">ログイン</div>
+    <p class="section-desc" data-i18n="loginDesc">登録済みの方はこちら。ログインすると、この端末に今までのデータが引き継がれます。</p>
     <div class="input-group">
-      <label for="login-id">ID</label>
+      <label for="login-id" data-i18n="labelId">ID</label>
       <input type="text" id="login-id" autocomplete="username">
     </div>
     <div class="input-group">
-      <label for="login-pw">パスワード</label>
+      <label for="login-pw" data-i18n="labelPassword">パスワード</label>
       <input type="password" id="login-pw" autocomplete="current-password">
     </div>
-    <button id="login-btn" class="primary-btn">ログインする</button>
+    <button id="login-btn" class="primary-btn" data-i18n="loginBtn">ログインする</button>
     <p id="login-msg" class="form-msg"></p>
     <div id="login-success-links" class="hidden">
-      <a href="https://uko05.github.io/14_GenshinOmikuji/" class="secondary-btn" style="display:inline-block; margin-top:8px; text-decoration:none;">原神おみくじを開く</a>
+      <a href="https://uko05.github.io/14_GenshinOmikuji/" class="secondary-btn" style="display:inline-block; margin-top:8px; text-decoration:none;" data-i18n="openOmikuji">原神おみくじを開く</a>
     </div>
   </section>
 
   <section class="section" id="merge-section">
-    <div class="section-title">機種変した方はこちら</div>
-    <p class="section-desc">
+    <div class="section-title" data-i18n="mergeTitle">機種変した方はこちら</div>
+    <p class="section-desc" data-i18n="mergeDesc">
       登録せずに占っていた方向けの引き継ぎ申請です。おみくじを引いた際に入力した「名前」「誕生日」を入力してください。
       管理者が確認のうえ、この端末に今までのデータを引き継ぎます（すぐには反映されません）。
     </p>
     <div class="input-group">
-      <label for="merge-name">おみくじ時に入力した名前</label>
+      <label for="merge-name" data-i18n="labelMergeName">おみくじ時に入力した名前</label>
       <input type="text" id="merge-name" maxlength="20">
     </div>
     <div class="input-group">
-      <label for="merge-birthday">誕生日</label>
+      <label for="merge-birthday" data-i18n="labelBirthday">誕生日</label>
       <input type="date" id="merge-birthday">
     </div>
-    <button id="merge-btn" class="primary-btn">申請する</button>
+    <button id="merge-btn" class="primary-btn" data-i18n="mergeBtn">申請する</button>
     <p id="merge-msg" class="form-msg"></p>
 
-    <p class="section-desc" style="margin-top:16px;">
+    <p class="section-desc" style="margin-top:16px;" data-i18n="mergeContactDesc">
       名前を入力せずに占っていた方・上記が当てはまらない方は、下のリンクから直接連絡してください。
     </p>
     <div class="contact-links">
@@ -102,7 +115,7 @@
   <a href="https://t.co/0jAcAV2GJv" target="_blank" rel="noopener">
     <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/discord_image.png" alt="Discord" class="footer-icon">
   </a>
-  <span class="sad-label">＜友達ください…</span>
+  <span class="sad-label" data-i18n="sadLabel">＜友達ください…</span>
 </footer>
 
 <script type="module" src="script.js"></script>
