@@ -24,6 +24,7 @@ onAuthStateChanged(auth, (user) => {
   if (isAdmin) {
     whoamiEl.textContent = user.email;
     loadRequests();
+    loadAccounts();
   }
 });
 
@@ -126,6 +127,75 @@ async function renderCandidates(container, req, requestId) {
       loadRequests();
     });
     container.appendChild(item);
+  });
+}
+
+// ===== 登録済みアカウント一覧 =====
+const accountsListEl = document.getElementById('accounts-list');
+const accountsCountEl = document.getElementById('accounts-count');
+const accountsFilterEl = document.getElementById('accounts-filter');
+let allAccounts = [];
+
+document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
+accountsFilterEl.addEventListener('input', () => renderAccounts(accountsFilterEl.value));
+
+async function loadAccounts() {
+  accountsListEl.innerHTML = '読み込み中…';
+  const linkSnap = await getDocs(collection(db, 'accountLinks'));
+
+  allAccounts = await Promise.all(linkSnap.docs.map(async (linkDoc) => {
+    const link = linkDoc.data();
+    let omikujiData = null;
+    if (link.omikujiUserId) {
+      const userSnap = await getDoc(doc(db, 'omikujiUsers', link.omikujiUserId));
+      if (userSnap.exists()) omikujiData = userSnap.data();
+    }
+    return {
+      authUid: linkDoc.id,
+      loginId: link.loginId || '',
+      omikujiUserId: link.omikujiUserId || '',
+      createdAt: link.createdAt,
+      omikujiData,
+    };
+  }));
+
+  renderAccounts(accountsFilterEl.value);
+}
+
+function renderAccounts(filterText) {
+  const needle = (filterText || '').trim().toLowerCase();
+  const filtered = !needle ? allAccounts : allAccounts.filter((a) => (
+    a.loginId.toLowerCase().includes(needle)
+    || (a.omikujiData?.name || '').toLowerCase().includes(needle)
+  ));
+
+  accountsCountEl.textContent = `${filtered.length} / ${allAccounts.length} 件`;
+
+  if (filtered.length === 0) {
+    accountsListEl.innerHTML = '該当するアカウントがありません。';
+    return;
+  }
+
+  accountsListEl.innerHTML = '';
+  filtered.forEach((a) => {
+    const u = a.omikujiData;
+    const item = document.createElement('div');
+    item.className = 'candidate-item';
+    item.innerHTML = `
+      <div class="candidate-info">
+        <div><b>登録ID:</b> ${escapeHtml(a.loginId)}</div>
+        <div><b>UID:</b> ${escapeHtml(a.omikujiUserId)}</div>
+        ${u
+          ? `<div><b>名前:</b> ${escapeHtml(u.name || '(無記名)')}／<b>誕生日:</b> ${escapeHtml(u.birthday || '-')}／<b>アチーブ数:</b> ${(u.achievements || []).length}</div>`
+          : '<div style="color:var(--danger);">紐づくomikujiデータが見つかりません</div>'}
+        <div><b>登録日時:</b> ${fmtTimestamp(a.createdAt)}</div>
+      </div>
+      ${u ? '<button class="primary-btn" style="width:auto; padding:8px 16px;" data-action="edit">編集</button>' : ''}
+    `;
+    if (u) {
+      item.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
+    }
+    accountsListEl.appendChild(item);
   });
 }
 

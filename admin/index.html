@@ -49,9 +49,21 @@
     <div id="requests-list"></div>
   </section>
 
+  <section class="section" id="accounts-section">
+    <div class="section-title">登録済みアカウント一覧</div>
+    <p class="section-desc">AccountCenterでID+パスワード登録した全ユーザーの一覧です。下の欄に入力すると一覧を絞り込みます（一覧は最初に一度だけ全件読み込み、以降はその場で絞り込むだけなので通信は発生しません）。</p>
+    <button id="reload-accounts-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+    <div class="input-group">
+      <label for="accounts-filter">絞り込み（登録ID・名前）</label>
+      <input type="text" id="accounts-filter" placeholder="入力するとリアルタイムで絞り込みます">
+    </div>
+    <div id="accounts-count" class="section-desc" style="margin:0 0 6px;"></div>
+    <div id="accounts-list" class="candidate-list"></div>
+  </section>
+
   <section class="section" id="search-section">
-    <div class="section-title">ユーザー検索・編集</div>
-    <p class="section-desc">UID、名前、または登録済みアカウントのID（AccountCenterで登録した方）で検索します。</p>
+    <div class="section-title">UID・名前で直接検索</div>
+    <p class="section-desc">未登録ユーザーなど、上の一覧に出てこない相手をUIDや名前で直接探すときに使います。</p>
     <div class="input-group">
       <label for="search-input">UID / 名前 / 登録ID</label>
       <input type="text" id="search-input">
