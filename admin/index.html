@@ -19,6 +19,7 @@
 <main id="admin-gate" class="admin-gate">
   <section class="section">
     <div class="section-title">管理者ログイン</div>
+    <form id="admin-login-form">
     <div class="input-group">
       <label for="admin-email">ID</label>
       <input type="text" id="admin-email" autocomplete="username">
@@ -27,7 +28,8 @@
       <label for="admin-pw">パスワード</label>
       <input type="password" id="admin-pw" autocomplete="current-password">
     </div>
-    <button id="admin-login-btn" class="primary-btn">ログイン</button>
+    <button type="submit" id="admin-login-btn" class="primary-btn">ログイン</button>
+    </form>
     <p id="admin-login-msg" class="form-msg"></p>
   </section>
 </main>

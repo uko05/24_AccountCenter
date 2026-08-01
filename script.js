@@ -149,6 +149,14 @@ function showMsg(el, text, isError) {
   el.classList.toggle('ok', !isError);
 }
 
+// ブラウザのパスワード保存プロンプトを明示的に呼び出す(対応ブラウザのみ)
+async function offerSaveCredential(id, pw) {
+  if (!('PasswordCredential' in window)) return;
+  try {
+    await navigator.credentials.store(new PasswordCredential({ id, password: pw, name: id }));
+  } catch { /* 対応していない・拒否された場合は無視 */ }
+}
+
 function authErrorMessage(e) {
   switch (e.code) {
     case 'auth/email-already-in-use': return t('errUsedId');
@@ -165,10 +173,12 @@ function authErrorMessage(e) {
 const uidBox = document.getElementById('current-uid');
 
 // ===== 登録 =====
+const registerForm = document.getElementById('register-form');
 const registerBtn = document.getElementById('register-btn');
 const registerMsg = document.getElementById('register-msg');
 
-registerBtn.addEventListener('click', async () => {
+registerForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
   const id = document.getElementById('reg-id').value.trim();
   const pw = document.getElementById('reg-pw').value;
 
@@ -189,6 +199,7 @@ registerBtn.addEventListener('click', async () => {
       createdAt: serverTimestamp(),
     });
     showMsg(registerMsg, t('msgRegisterOk'), false);
+    await offerSaveCredential(id, pw);
   } catch (e) {
     showMsg(registerMsg, authErrorMessage(e), true);
   } finally {
@@ -197,11 +208,13 @@ registerBtn.addEventListener('click', async () => {
 });
 
 // ===== ログイン =====
+const loginForm = document.getElementById('login-form');
 const loginBtn = document.getElementById('login-btn');
 const loginMsg = document.getElementById('login-msg');
 const loginSuccessLinks = document.getElementById('login-success-links');
 
-loginBtn.addEventListener('click', async () => {
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
   const id = document.getElementById('login-id').value.trim();
   const pw = document.getElementById('login-pw').value;
 
@@ -217,6 +230,7 @@ loginBtn.addEventListener('click', async () => {
       uidBox.textContent = linkSnap.data().omikujiUserId;
       showMsg(loginMsg, t('msgLoginOk'), false);
       loginSuccessLinks.classList.remove('hidden');
+      await offerSaveCredential(id, pw);
     } else {
       showMsg(loginMsg, t('msgLoginNoLink'), true);
     }

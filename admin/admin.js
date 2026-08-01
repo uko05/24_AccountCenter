@@ -27,15 +27,19 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-document.getElementById('admin-login-btn').addEventListener('click', async () => {
+document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
   const id = document.getElementById('admin-email').value.trim();
   const pw = document.getElementById('admin-pw').value;
   const msgEl = document.getElementById('admin-login-msg');
   try {
     await signInWithEmailAndPassword(auth, `${id}${AUTH_EMAIL_SUFFIX}`, pw);
     msgEl.textContent = '';
-  } catch (e) {
-    msgEl.textContent = `ログインに失敗しました（${e.code || e.message}）`;
+    if ('PasswordCredential' in window) {
+      try { await navigator.credentials.store(new PasswordCredential({ id, password: pw, name: id })); } catch { /* noop */ }
+    }
+  } catch (err) {
+    msgEl.textContent = `ログインに失敗しました（${err.code || err.message}）`;
     msgEl.classList.add('error');
   }
 });

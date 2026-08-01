@@ -46,6 +46,7 @@
   <section class="section" id="register-section">
     <div class="section-title" data-i18n="registerTitle">アカウント登録（任意）</div>
     <p class="section-desc" data-i18n="registerDesc">ID・パスワードを設定すると、機種変した際もログインするだけで今までのデータを引き継げます。登録しなくても今まで通り使えます。</p>
+    <form id="register-form">
     <div class="input-group">
       <label for="reg-id" data-i18n="labelId">ID</label>
       <input type="text" id="reg-id" autocomplete="username" maxlength="30" data-i18n-placeholder="idPlaceholder" placeholder="半角英数字など">
@@ -54,13 +55,15 @@
       <label for="reg-pw" data-i18n="labelPassword">パスワード</label>
       <input type="password" id="reg-pw" autocomplete="new-password" data-i18n-placeholder="pwPlaceholder" placeholder="6文字以上">
     </div>
-    <button id="register-btn" class="primary-btn" data-i18n="registerBtn">登録する</button>
+    <button type="submit" id="register-btn" class="primary-btn" data-i18n="registerBtn">登録する</button>
+    </form>
     <p id="register-msg" class="form-msg"></p>
   </section>
 
   <section class="section" id="login-section">
     <div class="section-title" data-i18n="loginTitle">ログイン</div>
     <p class="section-desc" data-i18n="loginDesc">登録済みの方はこちら。ログインすると、この端末に今までのデータが引き継がれます。</p>
+    <form id="login-form">
     <div class="input-group">
       <label for="login-id" data-i18n="labelId">ID</label>
       <input type="text" id="login-id" autocomplete="username">
@@ -69,7 +72,8 @@
       <label for="login-pw" data-i18n="labelPassword">パスワード</label>
       <input type="password" id="login-pw" autocomplete="current-password">
     </div>
-    <button id="login-btn" class="primary-btn" data-i18n="loginBtn">ログインする</button>
+    <button type="submit" id="login-btn" class="primary-btn" data-i18n="loginBtn">ログインする</button>
+    </form>
     <p id="login-msg" class="form-msg"></p>
     <div id="login-success-links" class="hidden">
       <a href="https://uko05.github.io/14_GenshinOmikuji/" class="secondary-btn" style="display:inline-block; margin-top:8px; text-decoration:none;" data-i18n="openOmikuji">原神おみくじを開く</a>
