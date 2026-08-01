@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp,
+  doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 
@@ -204,6 +204,12 @@ function renderAccounts(filterText) {
     const u = a.omikujiData;
     const counts = u ? countByRarity(u.achievements) : null;
     const tr = document.createElement('tr');
+    const actionsCell = `
+      <td style="white-space:nowrap;">
+        ${u ? '<button class="primary-btn" style="width:auto; padding:6px 12px;" data-action="edit">編集</button>' : ''}
+        <button class="danger-btn" data-action="delete">削除</button>
+      </td>
+    `;
     tr.innerHTML = u ? `
       <td>${escapeHtml(u.name || '(無記名)')}</td>
       <td>${escapeHtml(a.loginId)}</td>
@@ -212,19 +218,28 @@ function renderAccounts(filterText) {
       <td>${counts.silver}</td>
       <td>${counts.gold}</td>
       <td>${counts.legend}</td>
-      <td><button class="primary-btn" style="width:auto; padding:6px 12px;" data-action="edit">編集</button></td>
+      ${actionsCell}
     ` : `
       <td colspan="7" style="color:var(--danger);">紐づくomikujiデータが見つかりません（登録ID: ${escapeHtml(a.loginId)}／UID: ${escapeHtml(a.omikujiUserId)}）</td>
-      <td></td>
+      ${actionsCell}
     `;
     if (u) {
       tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
     }
+    tr.querySelector('[data-action="delete"]').addEventListener('click', () => deleteAccountLink(a));
     tbody.appendChild(tr);
   });
 
   accountsListEl.innerHTML = '';
   accountsListEl.appendChild(table);
+}
+
+async function deleteAccountLink(a) {
+  const label = a.loginId || a.authUid;
+  if (!confirm(`登録ID「${label}」の紐づけを削除します。\n\n※ Firebase Authのアカウントやomikujiのデータ自体は消えません。この登録情報(accountLinks)だけを削除します。\n\nよろしいですか？`)) return;
+  await deleteDoc(doc(db, 'accountLinks', a.authUid));
+  allAccounts = allAccounts.filter((x) => x.authUid !== a.authUid);
+  renderAccounts(accountsFilterEl.value);
 }
 
 // ===== ユーザー検索 =====
