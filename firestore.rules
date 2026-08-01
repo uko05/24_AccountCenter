@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 投票新規作成バリデーション（count は必ず 1 から）
+    function isValidVoteCreate() {
+      return request.resource.data.keys().hasOnly(['count', 'updatedAt'])
+        && request.resource.data.count == 1
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    // 投票更新バリデーション（count は必ず +1 のみ）
+    function isValidVoteUpdate() {
+      return request.resource.data.keys().hasOnly(['count', 'updatedAt'])
+        && request.resource.data.count == resource.data.count + 1
+        && request.resource.data.updatedAt is timestamp;
+    }
+
+    // AccountCenter 管理者判定
+    function isAdmin() {
+      return request.auth != null && request.auth.uid == 'UPInlRxp2eM8OI3p18UU1d3OzNc2';
+    }
+
+    // TiersList 票数
+    match /bakatareCounts/{character} {
+      allow read:   if true;
+      allow create: if isValidVoteCreate();
+      allow update: if isValidVoteUpdate();
+      allow delete: if false;
+    }
+
+    // GenshinCheck 票数
+    match /checkSheetVotes/{questionId}/characters/{charId} {
+      allow read:   if true;
+      allow create: if isValidVoteCreate();
+      allow update: if isValidVoteUpdate();
+      allow delete: if false;
+    }
+
+    // GenshinOmikuji ユーザーデータ＋占い統計（端末変更対応）
+    match /omikujiUsers/{userId} {
+      allow read, write: if true;
+    }
+
+    // AccountCenter 機種変申請（未登録ユーザーでも送信できるよう作成は誰でも可。
+    // 閲覧・処理(更新)・却下(更新)・削除は管理者のみ）
+    match /mergeRequests/{requestId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // AccountCenter 登録アカウント(Firebase Auth)とomikuji UID等の紐付け。
+    // 本人(自分のUIDのドキュメントのみ)か管理者のみ読み書き可。
+    match /accountLinks/{authUid} {
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == authUid);
+    }
+
+    // Bunpuzu お題収集（手入力タイトルの収集用。書き込み専用・読み取り不可）
+    match /bunpuzuOdai/{doc} {
+      allow read: if false;
+      allow create: if request.resource.data.keys().hasOnly(['title', 'top', 'bottom', 'left', 'right', 'lang', 'createdAt'])
+        && request.resource.data.title  is string && request.resource.data.title.size()  <= 100
+        && request.resource.data.top    is string && request.resource.data.top.size()    <= 100
+        && request.resource.data.bottom is string && request.resource.data.bottom.size() <= 100
+        && request.resource.data.left   is string && request.resource.data.left.size()   <= 100
+        && request.resource.data.right  is string && request.resource.data.right.size()  <= 100
+        && request.resource.data.lang in ['ja', 'en']
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if false;
+    }
+
+    // その他すべて拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

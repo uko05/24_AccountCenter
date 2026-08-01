@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="うーこの部屋 各サイト共通アカウント管理。UID確認・アカウント登録・機種変時のデータ引き継ぎ申請。">
+  <title>アカウント管理 - うーこの部屋</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Favicon -->
+  <link rel="icon" href="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/favicon_io/favicon.ico" type="image/x-icon">
+  <link rel="icon" sizes="16x16" href="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/favicon_io/favicon-16x16.png">
+  <link rel="icon" sizes="32x32" href="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/favicon_io/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/favicon_io/apple-touch-icon.png">
+  <link rel="icon" sizes="192x192" href="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/favicon_io/android-chrome-192x192.png">
+  <link rel="icon" sizes="512x512" href="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/favicon_io/android-chrome-512x512.png">
+</head>
+<body>
+
+<header>
+  <h1>✦ アカウント管理 ✦</h1>
+  <p>おみくじ等の記録の確認・引き継ぎはこちらから</p>
+</header>
+
+<main>
+
+  <section class="section" id="uid-section">
+    <div class="section-title">現在のUID</div>
+    <p class="section-desc">この端末でおみくじサイトなどを使うと自動的に発行されるIDです。通常はこの値を覚えておく必要はありません。</p>
+    <div class="uid-box" id="current-uid">読み込み中…</div>
+  </section>
+
+  <section class="section" id="register-section">
+    <div class="section-title">アカウント登録（任意）</div>
+    <p class="section-desc">ID・パスワードを設定すると、機種変した際もログインするだけで今までのデータを引き継げます。登録しなくても今まで通り使えます。</p>
+    <div class="input-group">
+      <label for="reg-id">ID</label>
+      <input type="text" id="reg-id" autocomplete="username" maxlength="30" placeholder="半角英数字など">
+    </div>
+    <div class="input-group">
+      <label for="reg-pw">パスワード</label>
+      <input type="password" id="reg-pw" autocomplete="new-password" placeholder="6文字以上">
+    </div>
+    <button id="register-btn" class="primary-btn">登録する</button>
+    <p id="register-msg" class="form-msg"></p>
+  </section>
+
+  <section class="section" id="login-section">
+    <div class="section-title">ログイン</div>
+    <p class="section-desc">登録済みの方はこちら。ログインすると、この端末に今までのデータが引き継がれます。</p>
+    <div class="input-group">
+      <label for="login-id">ID</label>
+      <input type="text" id="login-id" autocomplete="username">
+    </div>
+    <div class="input-group">
+      <label for="login-pw">パスワード</label>
+      <input type="password" id="login-pw" autocomplete="current-password">
+    </div>
+    <button id="login-btn" class="primary-btn">ログインする</button>
+    <p id="login-msg" class="form-msg"></p>
+    <div id="login-success-links" class="hidden">
+      <a href="https://uko05.github.io/14_GenshinOmikuji/" class="secondary-btn" style="display:inline-block; margin-top:8px; text-decoration:none;">原神おみくじを開く</a>
+    </div>
+  </section>
+
+  <section class="section" id="merge-section">
+    <div class="section-title">機種変した方はこちら</div>
+    <p class="section-desc">
+      登録せずに占っていた方向けの引き継ぎ申請です。おみくじを引いた際に入力した「名前」「誕生日」を入力してください。
+      管理者が確認のうえ、この端末に今までのデータを引き継ぎます（すぐには反映されません）。
+    </p>
+    <div class="input-group">
+      <label for="merge-name">おみくじ時に入力した名前</label>
+      <input type="text" id="merge-name" maxlength="20">
+    </div>
+    <div class="input-group">
+      <label for="merge-birthday">誕生日</label>
+      <input type="date" id="merge-birthday">
+    </div>
+    <button id="merge-btn" class="primary-btn">申請する</button>
+    <p id="merge-msg" class="form-msg"></p>
+
+    <p class="section-desc" style="margin-top:16px;">
+      名前を入力せずに占っていた方・上記が当てはまらない方は、下のリンクから直接連絡してください。
+    </p>
+    <div class="contact-links">
+      <a href="https://x.com/uko_dayo_" target="_blank" rel="noopener">
+        <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/twitter_image.png" alt="Twitter">
+      </a>
+      <a href="https://t.co/0jAcAV2GJv" target="_blank" rel="noopener">
+        <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/discord_image.png" alt="Discord">
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <a href="https://x.com/uko_dayo_" target="_blank" rel="noopener">
+    <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/twitter_image.png" alt="Twitter" class="footer-icon">
+  </a>
+  <a href="https://t.co/0jAcAV2GJv" target="_blank" rel="noopener">
+    <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/discord_image.png" alt="Discord" class="footer-icon">
+  </a>
+  <span class="sad-label">＜友達ください…</span>
+</footer>
+
+<script type="module" src="script.js"></script>
+<script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
+</body>
+</html>

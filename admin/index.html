@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>管理画面 - アカウント管理</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="icon" href="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/favicon_io/favicon.ico" type="image/x-icon">
+</head>
+<body>
+
+<header>
+  <h1>✦ 管理画面 ✦</h1>
+  <p>機種変申請の処理／ユーザーデータの閲覧・編集</p>
+</header>
+
+<!-- ログインゲート -->
+<main id="admin-gate" class="admin-gate">
+  <section class="section">
+    <div class="section-title">管理者ログイン</div>
+    <div class="input-group">
+      <label for="admin-email">ID</label>
+      <input type="text" id="admin-email" autocomplete="username">
+    </div>
+    <div class="input-group">
+      <label for="admin-pw">パスワード</label>
+      <input type="password" id="admin-pw" autocomplete="current-password">
+    </div>
+    <button id="admin-login-btn" class="primary-btn">ログイン</button>
+    <p id="admin-login-msg" class="form-msg"></p>
+  </section>
+</main>
+
+<!-- 管理コンテンツ -->
+<main id="admin-content" class="wide hidden">
+
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+    <span class="admin-badge" id="admin-whoami">-</span>
+    <button id="admin-logout-btn" class="secondary-btn">ログアウト</button>
+  </div>
+
+  <section class="section" id="requests-section">
+    <div class="section-title">機種変申請キュー</div>
+    <p class="section-desc">名前・誕生日をもとに候補を検索し、本人と判断できたら「このデータで引き継ぐ」を押してください。</p>
+    <button id="reload-requests-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+    <div id="requests-list"></div>
+  </section>
+
+  <section class="section" id="search-section">
+    <div class="section-title">ユーザー検索・編集</div>
+    <p class="section-desc">UID、または名前で検索します。</p>
+    <div class="input-group">
+      <label for="search-input">UID または 名前</label>
+      <input type="text" id="search-input">
+    </div>
+    <button id="search-btn" class="primary-btn" style="width:auto; padding:9px 24px;">検索</button>
+    <div id="search-results" class="candidate-list"></div>
+  </section>
+
+  <section class="section hidden" id="edit-section">
+    <div class="section-title">ユーザー編集</div>
+    <div class="uid-box" id="edit-uid" style="margin-bottom:14px;"></div>
+
+    <div class="input-group"><label>名前</label><input type="text" id="edit-name"></div>
+    <div class="input-group"><label>誕生日</label><input type="date" id="edit-birthday"></div>
+    <div class="input-group"><label>性別</label>
+      <select id="edit-gender">
+        <option value="">未設定</option>
+        <option value="male">男性</option>
+        <option value="female">女性</option>
+      </select>
+    </div>
+    <div class="input-group"><label>言語</label>
+      <select id="edit-lang">
+        <option value="ja">ja</option>
+        <option value="en">en</option>
+      </select>
+    </div>
+    <div class="input-group"><label>累計おみくじ回数 (achStats.totalCount)</label><input type="number" id="edit-total-count"></div>
+    <div class="input-group"><label>最大連続日数 (achStats.maxStreak)</label><input type="number" id="edit-max-streak"></div>
+    <div class="input-group">
+      <label>コレクション（アルカナID、1行に1つ。例: fool_upright）</label>
+      <textarea id="edit-collection"></textarea>
+    </div>
+
+    <div id="edit-achievements"></div>
+
+    <div class="btn-row">
+      <button id="save-edit-btn" class="primary-btn" style="width:auto; padding:9px 24px;">保存</button>
+      <button id="cancel-edit-btn" class="secondary-btn">閉じる</button>
+    </div>
+    <p id="edit-msg" class="form-msg"></p>
+  </section>
+
+</main>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
