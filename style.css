@@ -48,10 +48,16 @@ header h1 {
 
 header p { color: var(--muted); font-size: 0.85rem; }
 
-.lang-switch {
+.header-topbar {
   position: absolute;
   top: 12px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lang-switch {
   font-size: 13px;
   opacity: 0.8;
   white-space: nowrap;
@@ -59,7 +65,7 @@ header p { color: var(--muted); font-size: 0.85rem; }
 .lang-switch label { cursor: pointer; margin-left: 6px; }
 
 @media (max-width: 480px) {
-  .lang-switch { position: static; display: block; margin-top: 8px; }
+  .header-topbar { position: static; display: flex; margin-top: 8px; justify-content: center; }
 }
 
 main {

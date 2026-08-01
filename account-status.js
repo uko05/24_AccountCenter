@@ -4,6 +4,11 @@
  * 使い方: 各ページの </body> 直前に下記1行を追加するだけ（type="module" 必須）
  *   <script type="module" src="https://uko05.github.io/24_AccountCenter/account-status.js"></script>
  *
+ * ヘッダーの言語切替の左に置きたいので、ページ側に
+ *   <span id="uko-account-status-slot"></span>
+ * を .lang-switch の直前に置いておくと、そこに描画される。無ければ .lang-switch の直前に
+ * 自動挿入し、それも無ければ何もしない（無理に浮かせて表示しない）。
+ *
  * AccountCenterでID+パスワード登録/ログインすると、同一オリジン(uko05.github.io)内の
  * どのページでもFirebase Authのログイン状態を共有できるため、それを検知してバッジ表示する。
  * 登録していない人には何も表示しない（登録必須に見えないようにするため）。
@@ -40,31 +45,25 @@ function escapeHtml(str) {
 
 const css = `
   #uko-account-status {
-    position: fixed;
-    top: 56px;
-    left: 12px;
-    z-index: 997;
-    background: rgba(255,255,255,0.92);
-    border: 1px solid #dddddd;
-    border-radius: 20px;
-    padding: 5px 10px;
-    font-size: 12px;
-    color: #333;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    gap: 6px;
+    font-size: 12px;
+    color: inherit;
+    opacity: 0.85;
+    white-space: nowrap;
   }
   #uko-account-status button {
     background: none;
     border: none;
-    color: #888;
+    color: inherit;
     text-decoration: underline;
     cursor: pointer;
     font-size: 12px;
     padding: 0;
+    opacity: 0.8;
   }
-  #uko-account-status button:hover { color: #333; }
+  #uko-account-status button:hover { opacity: 1; }
 `;
 
 function ensureStyle() {
@@ -75,19 +74,32 @@ function ensureStyle() {
   document.head.appendChild(styleEl);
 }
 
+function findOrCreateSlot() {
+  let slot = document.getElementById('uko-account-status-slot');
+  if (slot) return slot;
+
+  const langSwitch = document.querySelector('.lang-switch');
+  if (!langSwitch || !langSwitch.parentNode) return null;
+
+  slot = document.createElement('span');
+  slot.id = 'uko-account-status-slot';
+  langSwitch.parentNode.insertBefore(slot, langSwitch);
+  return slot;
+}
+
 function removeBadge() {
-  document.getElementById('uko-account-status')?.remove();
+  const slot = document.getElementById('uko-account-status-slot');
+  if (slot) slot.innerHTML = '';
 }
 
 function renderBadge(loginId) {
-  removeBadge();
+  const slot = findOrCreateSlot();
+  if (!slot) return;
   ensureStyle();
+
   const t = text[currentLang()];
-  const el = document.createElement('div');
-  el.id = 'uko-account-status';
-  el.innerHTML = `<span>${escapeHtml(t.loggedInAs(loginId))}</span><button type="button">${escapeHtml(t.logout)}</button>`;
-  el.querySelector('button').addEventListener('click', () => signOut(auth));
-  document.body.appendChild(el);
+  slot.innerHTML = `<span id="uko-account-status"><span>${escapeHtml(t.loggedInAs(loginId))}</span><button type="button">${escapeHtml(t.logout)}</button></span>`;
+  slot.querySelector('button').addEventListener('click', () => signOut(auth));
 }
 
 onAuthStateChanged(auth, (user) => {
