@@ -196,8 +196,8 @@ function openEditor(uid, data) {
   document.getElementById('edit-uid').textContent = uid;
   document.getElementById('edit-name').value = data.name || '';
   document.getElementById('edit-birthday').value = data.birthday || '';
-  document.getElementById('edit-gender').value = data.gender || '';
-  document.getElementById('edit-lang').value = data.lang || 'ja';
+  setRadioValue('edit-gender', data.gender || '');
+  setRadioValue('edit-lang', data.lang || 'ja');
   document.getElementById('edit-total-count').value = data.achStats?.totalCount ?? 0;
   document.getElementById('edit-max-streak').value = data.achStats?.maxStreak ?? 0;
   document.getElementById('edit-collection').value = (data.collection || []).join('\n');
@@ -245,8 +245,8 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
   const payload = {
     name: document.getElementById('edit-name').value.trim(),
     birthday: document.getElementById('edit-birthday').value,
-    gender: document.getElementById('edit-gender').value,
-    lang: document.getElementById('edit-lang').value,
+    gender: getRadioValue('edit-gender'),
+    lang: getRadioValue('edit-lang') || 'ja',
     collection: collectionIds,
     achievements,
     achStats: {
@@ -267,6 +267,14 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     msgEl.classList.add('error');
   }
 });
+
+function setRadioValue(name, value) {
+  document.querySelectorAll(`input[name="${name}"]`).forEach((r) => { r.checked = r.value === value; });
+}
+
+function getRadioValue(name) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value ?? '';
+}
 
 function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({

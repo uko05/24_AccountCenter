@@ -132,6 +132,14 @@ main.wide { max-width: 980px; }
 
 .input-group textarea { min-height: 90px; resize: vertical; }
 
+.radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 0.9rem;
+}
+.radio-row label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+
 .primary-btn {
   display: block;
   width: 100%;

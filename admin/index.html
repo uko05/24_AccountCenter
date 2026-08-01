@@ -66,18 +66,20 @@
 
     <div class="input-group"><label>名前</label><input type="text" id="edit-name"></div>
     <div class="input-group"><label>誕生日</label><input type="date" id="edit-birthday"></div>
-    <div class="input-group"><label>性別</label>
-      <select id="edit-gender">
-        <option value="">未設定</option>
-        <option value="male">男性</option>
-        <option value="female">女性</option>
-      </select>
+    <div class="input-group">
+      <label>性別</label>
+      <div class="radio-row">
+        <label><input type="radio" name="edit-gender" value=""> 任意（未設定）</label>
+        <label><input type="radio" name="edit-gender" value="male"> 男性</label>
+        <label><input type="radio" name="edit-gender" value="female"> 女性</label>
+      </div>
     </div>
-    <div class="input-group"><label>言語</label>
-      <select id="edit-lang">
-        <option value="ja">ja</option>
-        <option value="en">en</option>
-      </select>
+    <div class="input-group">
+      <label>言語</label>
+      <div class="radio-row">
+        <label><input type="radio" name="edit-lang" value="ja"> 日本語</label>
+        <label><input type="radio" name="edit-lang" value="en"> English</label>
+      </div>
     </div>
     <div class="input-group"><label>累計おみくじ回数 (achStats.totalCount)</label><input type="number" id="edit-total-count"></div>
     <div class="input-group"><label>最大連続日数 (achStats.maxStreak)</label><input type="number" id="edit-max-streak"></div>
