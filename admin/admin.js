@@ -6,7 +6,18 @@ import {
 import {
   doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { ACHIEVEMENT_GROUPS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
+import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
+
+const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
+
+function countByRarity(achievementIds) {
+  const counts = { bronze: 0, silver: 0, gold: 0, legend: 0 };
+  (achievementIds || []).forEach((id) => {
+    const rarity = RARITY_BY_ID.get(id);
+    if (rarity && rarity in counts) counts[rarity]++;
+  });
+  return counts;
+}
 
 const ADMIN_UID = 'UPInlRxp2eM8OI3p18UU1d3OzNc2';
 const AUTH_EMAIL_SUFFIX = '@uko05.internal';
@@ -176,27 +187,45 @@ function renderAccounts(filterText) {
     return;
   }
 
-  accountsListEl.innerHTML = '';
+  const table = document.createElement('table');
+  table.className = 'user-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>名前</th><th>登録ID</th><th>UID</th><th>誕生日</th>
+        <th>銅</th><th>銀</th><th>金</th><th>虹(レジェンド)</th><th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector('tbody');
+
   filtered.forEach((a) => {
     const u = a.omikujiData;
-    const item = document.createElement('div');
-    item.className = 'candidate-item';
-    item.innerHTML = `
-      <div class="candidate-info">
-        <div><b>登録ID:</b> ${escapeHtml(a.loginId)}</div>
-        <div><b>UID:</b> ${escapeHtml(a.omikujiUserId)}</div>
-        ${u
-          ? `<div><b>名前:</b> ${escapeHtml(u.name || '(無記名)')}／<b>誕生日:</b> ${escapeHtml(u.birthday || '-')}／<b>アチーブ数:</b> ${(u.achievements || []).length}</div>`
-          : '<div style="color:var(--danger);">紐づくomikujiデータが見つかりません</div>'}
-        <div><b>登録日時:</b> ${fmtTimestamp(a.createdAt)}</div>
-      </div>
-      ${u ? '<button class="primary-btn" style="width:auto; padding:8px 16px;" data-action="edit">編集</button>' : ''}
+    const counts = u ? countByRarity(u.achievements) : null;
+    const tr = document.createElement('tr');
+    tr.innerHTML = u ? `
+      <td>${escapeHtml(u.name || '(無記名)')}</td>
+      <td>${escapeHtml(a.loginId)}</td>
+      <td>${escapeHtml(a.omikujiUserId)}</td>
+      <td>${escapeHtml(u.birthday || '-')}</td>
+      <td>${counts.bronze}</td>
+      <td>${counts.silver}</td>
+      <td>${counts.gold}</td>
+      <td>${counts.legend}</td>
+      <td><button class="primary-btn" style="width:auto; padding:6px 12px;" data-action="edit">編集</button></td>
+    ` : `
+      <td colspan="7" style="color:var(--danger);">紐づくomikujiデータが見つかりません（登録ID: ${escapeHtml(a.loginId)}／UID: ${escapeHtml(a.omikujiUserId)}）</td>
+      <td></td>
     `;
     if (u) {
-      item.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
+      tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
     }
-    accountsListEl.appendChild(item);
+    tbody.appendChild(tr);
   });
+
+  accountsListEl.innerHTML = '';
+  accountsListEl.appendChild(table);
 }
 
 // ===== ユーザー検索 =====
