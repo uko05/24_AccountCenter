@@ -193,7 +193,7 @@ function renderAccounts(filterText) {
     <thead>
       <tr>
         <th style="width:auto;">名前</th>
-        <th style="width:20%; white-space:nowrap;">登録ID</th>
+        <th style="width:30%; white-space:nowrap;">登録ID</th>
         <th style="width:1%; white-space:nowrap;">誕生日</th>
         <th style="width:1%; white-space:nowrap;">銅</th>
         <th style="width:1%; white-space:nowrap;">銀</th>
