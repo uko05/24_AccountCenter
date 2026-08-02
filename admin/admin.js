@@ -311,7 +311,7 @@ const editSection   = document.getElementById('edit-section');
 let currentEditUid   = null;
 let currentEditData  = null;
 
-function openEditor(uid, data) {
+async function openEditor(uid, data) {
   currentEditUid = uid;
   currentEditData = data;
 
@@ -326,9 +326,25 @@ function openEditor(uid, data) {
 
   renderAchievementCheckboxes(new Set(data.achievements || []));
 
+  const roleSnap = await getDoc(doc(db, 'sharedUserRoles', uid));
+  const roleData = roleSnap.exists() ? roleSnap.data() : {};
+  setRadioValue('edit-role', roleData.role || 'general');
+  document.getElementById('edit-debug-connect').checked = !!roleData.debugConnect;
+  document.getElementById('edit-debug-omikuji').checked = !!roleData.debugOmikuji;
+  updateRoleDebugOptionsVisibility();
+
   editSection.classList.remove('hidden');
   editSection.scrollIntoView({ behavior: 'smooth' });
 }
+
+function updateRoleDebugOptionsVisibility() {
+  const isDebugger = getRadioValue('edit-role') === 'debugger';
+  document.getElementById('edit-role-debug-options').classList.toggle('hidden', !isDebugger);
+}
+
+document.querySelectorAll('input[name="edit-role"]').forEach((r) => {
+  r.addEventListener('change', updateRoleDebugOptionsVisibility);
+});
 
 function renderAchievementCheckboxes(achievedSet) {
   const container = document.getElementById('edit-achievements');
@@ -379,8 +395,21 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     updatedAt: serverTimestamp(),
   };
 
+  const role = getRadioValue('edit-role') || 'general';
+  const debugConnect = document.getElementById('edit-debug-connect').checked;
+  const debugOmikuji = document.getElementById('edit-debug-omikuji').checked;
+
   try {
     await setDoc(doc(db, 'omikujiUsers', currentEditUid), payload, { merge: true });
+    await setDoc(doc(db, 'sharedUserRoles', currentEditUid), {
+      role,
+      debugConnect: role === 'debugger' && debugConnect,
+      debugOmikuji: role === 'debugger' && debugOmikuji,
+      updatedAt: serverTimestamp(),
+    });
+    if (role === 'debugger' && debugConnect) {
+      await grantConnectDebugAchievement(currentEditUid);
+    }
     msgEl.textContent = '保存しました。';
     msgEl.classList.remove('error');
     msgEl.classList.add('ok');
@@ -389,6 +418,19 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     msgEl.classList.add('error');
   }
 });
+
+// コネクトバトルのデバッグ権限を付与した相手に「デバッグ担当」実績を付与する。
+// 一度付いたら、後でデバッガーを解除しても実績は消さない(ここでは追加しかしない)。
+async function grantConnectDebugAchievement(sharedUserId) {
+  const snap = await getDocs(query(collection(db, 'connectUsers'), where('sharedUserId', '==', sharedUserId)));
+  for (const connectDoc of snap.docs) {
+    const achievements = connectDoc.data().achievements || [];
+    if (achievements.includes('debug_test')) continue;
+    await setDoc(doc(db, 'connectUsers', connectDoc.id), {
+      achievements: [...achievements, 'debug_test'],
+    }, { merge: true });
+  }
+}
 
 function setRadioValue(name, value) {
   document.querySelectorAll(`input[name="${name}"]`).forEach((r) => { r.checked = r.value === value; });

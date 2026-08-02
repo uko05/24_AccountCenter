@@ -55,6 +55,13 @@ service cloud.firestore {
       allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == authUid);
     }
 
+    // うこ氏サイト群共通ロール(一般/デバッガー/管理者)。共有ID(sharedUserId = omikuji UID)をキーにする。
+    // 各サイトが自分でロールを判定できるよう読み取りは誰でも可、書き込みは管理者のみ。
+    match /sharedUserRoles/{sharedUserId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Bunpuzu お題収集（手入力タイトルの収集用。書き込み専用・読み取り不可）
     match /bunpuzuOdai/{doc} {
       allow read: if false;
