@@ -4,10 +4,9 @@
  * 使い方: 各ページの </body> 直前に下記1行を追加するだけ（type="module" 必須）
  *   <script type="module" src="https://uko05.github.io/24_AccountCenter/account-status.js"></script>
  *
- * ヘッダーの言語切替の左に置きたいので、ページ側に
- *   <span id="uko-account-status-slot"></span>
- * を .lang-switch の直前に置いておくと、そこに描画される。無ければ .lang-switch の直前に
- * 自動挿入し、それも無ければ何もしない（無理に浮かせて表示しない）。
+ * ページ側に <span id="uko-account-status-slot"></span> を置いておくと、そこに描画される
+ * （位置・見た目はページ側のCSSで自由に配置してよい）。無ければ .lang-switch の直前に自動挿入し、
+ * それも無ければ何もしない（無理に浮かせて表示しない）。
  *
  * AccountCenterでID+パスワード登録/ログインすると、同一オリジン(uko05.github.io)内の
  * どのページでもFirebase Authのログイン状態を共有できるため、それを検知してバッジ表示する。
@@ -25,7 +24,11 @@ const firebaseConfig = {
   appId: "1:658089418604:web:288c06b331da8c4f789d49",
 };
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// このバッジはAccountCenter(ID+パスワード)のログインセッションだけを見たいので、
+// 常にデフォルト(無名)Appを対象にする。ページ側が独自の名前付きAppを使っていても(例: connect10)
+// それとは別に、デフォルトAppだけを見て/作って判定する。
+const hasDefaultApp = getApps().some((a) => a.name === '[DEFAULT]');
+const app = hasDefaultApp ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
 const text = {
@@ -49,19 +52,21 @@ const css = `
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: inherit;
-    opacity: 0.85;
+    color: #333;
+    background: rgba(255,255,255,0.88);
+    border-radius: 12px;
+    padding: 4px 10px;
     white-space: nowrap;
   }
   #uko-account-status button {
     background: none;
     border: none;
-    color: inherit;
+    color: #333;
     text-decoration: underline;
     cursor: pointer;
     font-size: 12px;
     padding: 0;
-    opacity: 0.8;
+    opacity: 0.75;
   }
   #uko-account-status button:hover { opacity: 1; }
 `;

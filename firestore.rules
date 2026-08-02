@@ -69,6 +69,156 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Connect10（コネバト）待機列（現行コードからは未使用。将来のため最小限のルールを残置）
+    match /connectWaitingPlayers/{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Connect10（コネバト）対戦部屋（Phase2: 参加者限定 + フィールド制限 + 値の変化量チェック）
+    match /connectRooms/{roomId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.player1_ID == request.auth.uid
+        && request.resource.data.player2_ID == null
+        && request.resource.data.status == "waiting";
+
+      allow update: if request.auth != null
+        && resource.data.status == "waiting"
+        && resource.data.player2_ID == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['player2_ID', 'player2_CharaID', 'player2_Name', 'status', 'player2_LastActive']
+        )
+        && request.resource.data.player2_ID == request.auth.uid
+        && request.resource.data.player1_ID == resource.data.player1_ID;
+
+      allow update: if request.auth != null
+        && resource.data.status == "waiting"
+        && resource.data.player1_ID == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['player1_LastActive']);
+
+      allow update: if request.auth != null
+        && request.auth.uid in [resource.data.player1_ID, resource.data.player2_ID]
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'player1_ChargeNow', 'player2_ChargeNow',
+          'player1_UltCount', 'player2_UltCount',
+          'player1_TimeLimit', 'player2_TimeLimit',
+          'player1_TimeoutCount', 'player2_TimeoutCount',
+          'player1_LastActive', 'player2_LastActive',
+          'red_Win', 'yellow_Win',
+          'status', 'turn', 'turnCount', 'changeStone', 'stones', 'startP',
+          'winnerUid', 'resultType', 'p1CharaId', 'p2CharaId',
+          'bo3Final', 'rated', 'finishedAt',
+          'zhongliBlocked', 'zhongliTurnsLeft', 'zhongliCasterColor',
+          'durinPending', 'durinCasterColor',
+          'cerluaActive', 'cerluaCasterColor',
+          'silverwolfMatchWinner'
+        ])
+        && request.resource.data.player1_ID == resource.data.player1_ID
+        && request.resource.data.player2_ID == resource.data.player2_ID
+        && request.resource.data.player1_CharaID == resource.data.player1_CharaID
+        && request.resource.data.player2_CharaID == resource.data.player2_CharaID
+        && request.resource.data.player1_Color == resource.data.player1_Color
+        && request.resource.data.player2_Color == resource.data.player2_Color
+        && request.resource.data.roomID == resource.data.roomID
+        && (!("matchType" in resource.data) || request.resource.data.matchType == resource.data.matchType)
+        && request.resource.data.player1_ChargeNow is int && request.resource.data.player1_ChargeNow >= 0 && request.resource.data.player1_ChargeNow <= 200
+        && request.resource.data.player2_ChargeNow is int && request.resource.data.player2_ChargeNow >= 0 && request.resource.data.player2_ChargeNow <= 200
+        && request.resource.data.player1_TimeLimit is int && request.resource.data.player1_TimeLimit >= 0 && request.resource.data.player1_TimeLimit <= 100
+        && request.resource.data.player2_TimeLimit is int && request.resource.data.player2_TimeLimit >= 0 && request.resource.data.player2_TimeLimit <= 100
+        && request.resource.data.changeStone is int && request.resource.data.changeStone >= 0 && request.resource.data.changeStone <= 3
+        && request.resource.data.turn in ['P1', 'P2']
+        && request.resource.data.startP in ['P1', 'P2']
+        && request.resource.data.status in ['waiting', 'in_progress', 'leave']
+        && request.resource.data.red_Win is int && request.resource.data.red_Win >= resource.data.red_Win && request.resource.data.red_Win <= resource.data.red_Win + 1 && request.resource.data.red_Win <= 3
+        && request.resource.data.yellow_Win is int && request.resource.data.yellow_Win >= resource.data.yellow_Win && request.resource.data.yellow_Win <= resource.data.yellow_Win + 1 && request.resource.data.yellow_Win <= 3
+        && request.resource.data.turnCount is int && (request.resource.data.turnCount == resource.data.turnCount || request.resource.data.turnCount == resource.data.turnCount + 1 || request.resource.data.turnCount == 1)
+        && request.resource.data.player1_UltCount is int && request.resource.data.player1_UltCount >= resource.data.player1_UltCount && request.resource.data.player1_UltCount <= resource.data.player1_UltCount + 1
+        && request.resource.data.player2_UltCount is int && request.resource.data.player2_UltCount >= resource.data.player2_UltCount && request.resource.data.player2_UltCount <= resource.data.player2_UltCount + 1
+        && request.resource.data.player1_TimeoutCount is int && request.resource.data.player1_TimeoutCount >= resource.data.player1_TimeoutCount && request.resource.data.player1_TimeoutCount <= resource.data.player1_TimeoutCount + 1
+        && request.resource.data.player2_TimeoutCount is int && request.resource.data.player2_TimeoutCount >= resource.data.player2_TimeoutCount && request.resource.data.player2_TimeoutCount <= resource.data.player2_TimeoutCount + 1
+        && (
+          !("bo3Final" in request.resource.data) || request.resource.data.bo3Final != true
+          || resource.data.red_Win == 3 || resource.data.yellow_Win == 3
+        )
+        && (
+          !("bo3Final" in resource.data) || resource.data.bo3Final != true
+          || (
+            request.resource.data.winnerUid == resource.data.winnerUid
+            && request.resource.data.resultType == resource.data.resultType
+            && request.resource.data.p1CharaId == resource.data.p1CharaId
+            && request.resource.data.p2CharaId == resource.data.p2CharaId
+            && request.resource.data.bo3Final == resource.data.bo3Final
+          )
+        )
+        && (!("winnerUid" in request.resource.data) || request.resource.data.winnerUid in [resource.data.player1_ID, resource.data.player2_ID])
+        && (
+          !("rated" in resource.data)
+          || resource.data.rated == false
+          || resource.data.rated == request.resource.data.rated
+        );
+
+      allow delete: if request.auth != null
+        && (
+          resource.data.player1_ID == request.auth.uid
+          || resource.data.player2_ID == request.auth.uid
+          || (
+            resource.data.status == "waiting"
+            && "player1_LastActive" in resource.data
+            && request.time > resource.data.player1_LastActive + duration.value(30, 's')
+          )
+        );
+    }
+
+    // Connect10（コネバト）レーティング。sharedUserIdはAccountCenter連携用（省略可）
+    match /connectUsers/{uid} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['rating', 'matchCount', 'winCount', 'lastMatchAt', 'achievements', 'achievementCount', 'achStats', 'equippedTitles', 'unlockedHiddenCharas', 'unlockedHiddenCharaCount', 'sharedUserId'])
+        && request.resource.data.rating == 1500
+        && request.resource.data.matchCount == 0
+        && request.resource.data.winCount == 0;
+
+      allow update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['rating', 'matchCount', 'winCount', 'lastMatchAt', 'charaWins', 'playerName', 'achievements', 'achievementCount', 'achStats', 'equippedTitles', 'unlockedHiddenCharas', 'unlockedHiddenCharaCount', 'sharedUserId'])
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 100
+        && request.resource.data.rating <= resource.data.rating + 48
+        && request.resource.data.rating >= resource.data.rating - 72
+        && request.resource.data.matchCount is int
+        && (request.resource.data.matchCount == resource.data.matchCount || request.resource.data.matchCount == resource.data.matchCount + 1)
+        && request.resource.data.winCount is int
+        && request.resource.data.winCount >= resource.data.winCount
+        && request.resource.data.winCount <= resource.data.winCount + 1
+        && (!("charaWins" in request.resource.data) || request.resource.data.charaWins is map)
+        && (!("playerName" in request.resource.data) || (request.resource.data.playerName is string && request.resource.data.playerName.size() <= 20))
+        && (!("achievements" in request.resource.data) || request.resource.data.achievements is list)
+        && (!("achievementCount" in request.resource.data) || (request.resource.data.achievementCount is int && request.resource.data.achievementCount >= 0 && request.resource.data.achievementCount <= 200))
+        && (!("achStats" in request.resource.data) || request.resource.data.achStats is map)
+        && (!("equippedTitles" in request.resource.data) || (request.resource.data.equippedTitles is list && request.resource.data.equippedTitles.size() <= 2))
+        && (!("sharedUserId" in request.resource.data) || (request.resource.data.sharedUserId is string && request.resource.data.sharedUserId.size() <= 60));
+    }
+
+    // Connect10（コネバト）キャラ統計
+    match /connectCharaStats/{charaId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['pickCount', 'winCount'])
+        && request.resource.data.pickCount is int && request.resource.data.pickCount >= 0 && request.resource.data.pickCount <= 2
+        && request.resource.data.winCount is int && request.resource.data.winCount >= 0 && request.resource.data.winCount <= 1;
+
+      allow update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['pickCount', 'winCount'])
+        && request.resource.data.pickCount is int
+        && request.resource.data.pickCount >= resource.data.pickCount
+        && request.resource.data.pickCount <= resource.data.pickCount + 2
+        && request.resource.data.winCount is int
+        && request.resource.data.winCount >= resource.data.winCount
+        && request.resource.data.winCount <= resource.data.winCount + 1;
+    }
+
     // その他すべて拒否
     match /{document=**} {
       allow read, write: if false;
