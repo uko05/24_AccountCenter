@@ -204,10 +204,13 @@ function renderAccounts(filterText) {
     const u = a.omikujiData;
     const counts = u ? countByRarity(u.achievements) : null;
     const tr = document.createElement('tr');
+    const actionBtnStyle = 'width:auto; display:inline-block; box-sizing:border-box; padding:6px 14px; font-size:0.8rem; font-weight:normal; line-height:1.4; border-radius:20px;';
     const actionsCell = `
       <td style="white-space:nowrap;">
-        ${u ? '<button class="primary-btn" style="width:auto; padding:6px 12px;" data-action="edit">編集</button>' : ''}
-        <button class="danger-btn" data-action="delete">削除</button>
+        <div style="display:flex; gap:6px; flex-wrap:nowrap;">
+          ${u ? `<button class="primary-btn" style="${actionBtnStyle}" data-action="edit">編集</button>` : ''}
+          <button class="danger-btn" style="${actionBtnStyle}" data-action="delete">削除</button>
+        </div>
       </td>
     `;
     tr.innerHTML = u ? `
