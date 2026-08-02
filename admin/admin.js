@@ -192,8 +192,9 @@ function renderAccounts(filterText) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th>名前</th><th>登録ID</th><th>誕生日</th>
-        <th>銅</th><th>銀</th><th>金</th><th>虹</th><th></th>
+        <th style="width:auto;">名前</th><th>登録ID</th><th>誕生日</th>
+        <th>銅</th><th>銀</th><th>金</th><th>虹</th>
+        <th style="width:1%; white-space:nowrap;"></th>
       </tr>
     </thead>
     <tbody></tbody>
