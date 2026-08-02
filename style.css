@@ -144,7 +144,7 @@ main.wide { max-width: 980px; }
   gap: 14px;
   font-size: 0.9rem;
 }
-.radio-row label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.radio-row label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 
 .primary-btn {
   display: block;
