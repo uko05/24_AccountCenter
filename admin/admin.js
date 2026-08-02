@@ -192,8 +192,13 @@ function renderAccounts(filterText) {
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width:auto;">名前</th><th>登録ID</th><th>誕生日</th>
-        <th>銅</th><th>銀</th><th>金</th><th>虹</th>
+        <th style="width:auto;">名前</th>
+        <th style="width:1%; white-space:nowrap;">登録ID</th>
+        <th style="width:1%; white-space:nowrap;">誕生日</th>
+        <th style="width:1%; white-space:nowrap;">銅</th>
+        <th style="width:1%; white-space:nowrap;">銀</th>
+        <th style="width:1%; white-space:nowrap;">金</th>
+        <th style="width:1%; white-space:nowrap;">虹</th>
         <th style="width:1%; white-space:nowrap;"></th>
       </tr>
     </thead>
@@ -216,12 +221,12 @@ function renderAccounts(filterText) {
     `;
     tr.innerHTML = u ? `
       <td>${escapeHtml(u.name || '(無記名)')}</td>
-      <td>${escapeHtml(a.loginId)}</td>
-      <td>${escapeHtml(u.birthday || '-')}</td>
-      <td>${counts.bronze}</td>
-      <td>${counts.silver}</td>
-      <td>${counts.gold}</td>
-      <td>${counts.legend}</td>
+      <td style="white-space:nowrap;">${escapeHtml(a.loginId)}</td>
+      <td style="white-space:nowrap;">${escapeHtml(u.birthday || '-')}</td>
+      <td style="white-space:nowrap;">${counts.bronze}</td>
+      <td style="white-space:nowrap;">${counts.silver}</td>
+      <td style="white-space:nowrap;">${counts.gold}</td>
+      <td style="white-space:nowrap;">${counts.legend}</td>
       ${actionsCell}
     ` : `
       <td colspan="7" style="color:var(--danger);">紐づくomikujiデータが見つかりません（登録ID: ${escapeHtml(a.loginId)}／UID: ${escapeHtml(a.omikujiUserId)}）</td>
