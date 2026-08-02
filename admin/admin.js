@@ -4,8 +4,10 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp,
+  doc, getDoc, setDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+const ACCOUNTS_LOAD_LIMIT = 100;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 
 const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
@@ -141,49 +143,63 @@ async function renderCandidates(container, req, requestId) {
   });
 }
 
-// ===== 登録済みアカウント一覧 =====
+// ===== ユーザー一覧（最終更新順、登録・未登録どちらも） =====
 const accountsListEl = document.getElementById('accounts-list');
 const accountsCountEl = document.getElementById('accounts-count');
 const accountsFilterEl = document.getElementById('accounts-filter');
+const accountsFilterRegisteredEl = document.getElementById('accounts-filter-registered');
+const accountsFilterUnregisteredEl = document.getElementById('accounts-filter-unregistered');
 let allAccounts = [];
 
 document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
 accountsFilterEl.addEventListener('input', () => renderAccounts(accountsFilterEl.value));
+accountsFilterRegisteredEl.addEventListener('change', () => renderAccounts(accountsFilterEl.value));
+accountsFilterUnregisteredEl.addEventListener('change', () => renderAccounts(accountsFilterEl.value));
 
 async function loadAccounts() {
   accountsListEl.innerHTML = '読み込み中…';
-  const linkSnap = await getDocs(collection(db, 'accountLinks'));
 
-  allAccounts = await Promise.all(linkSnap.docs.map(async (linkDoc) => {
+  const [usersSnap, linkSnap] = await Promise.all([
+    getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'), limit(ACCOUNTS_LOAD_LIMIT))),
+    getDocs(collection(db, 'accountLinks')),
+  ]);
+
+  const linkByOmikujiId = new Map();
+  linkSnap.docs.forEach((linkDoc) => {
     const link = linkDoc.data();
-    let omikujiData = null;
-    if (link.omikujiUserId) {
-      const userSnap = await getDoc(doc(db, 'omikujiUsers', link.omikujiUserId));
-      if (userSnap.exists()) omikujiData = userSnap.data();
-    }
+    if (link.omikujiUserId) linkByOmikujiId.set(link.omikujiUserId, { ...link, authUid: linkDoc.id });
+  });
+
+  allAccounts = usersSnap.docs.map((userDoc) => {
+    const link = linkByOmikujiId.get(userDoc.id);
     return {
-      authUid: linkDoc.id,
-      loginId: link.loginId || '',
-      omikujiUserId: link.omikujiUserId || '',
-      createdAt: link.createdAt,
-      omikujiData,
+      omikujiUserId: userDoc.id,
+      authUid: link?.authUid || null,
+      loginId: link?.loginId || '',
+      isRegistered: !!link,
+      omikujiData: userDoc.data(),
     };
-  }));
+  });
 
   renderAccounts(accountsFilterEl.value);
 }
 
 function renderAccounts(filterText) {
   const needle = (filterText || '').trim().toLowerCase();
-  const filtered = !needle ? allAccounts : allAccounts.filter((a) => (
-    a.loginId.toLowerCase().includes(needle)
-    || (a.omikujiData?.name || '').toLowerCase().includes(needle)
-  ));
+  const showRegistered = accountsFilterRegisteredEl.checked;
+  const showUnregistered = accountsFilterUnregisteredEl.checked;
 
-  accountsCountEl.textContent = `${filtered.length} / ${allAccounts.length} 件`;
+  const filtered = allAccounts.filter((a) => {
+    if (a.isRegistered && !showRegistered) return false;
+    if (!a.isRegistered && !showUnregistered) return false;
+    if (!needle) return true;
+    return a.loginId.toLowerCase().includes(needle) || (a.omikujiData?.name || '').toLowerCase().includes(needle);
+  });
+
+  accountsCountEl.textContent = `${filtered.length} / ${allAccounts.length} 件（最終更新が新しい順に最大${ACCOUNTS_LOAD_LIMIT}件を読み込み）`;
 
   if (filtered.length === 0) {
-    accountsListEl.innerHTML = '該当するアカウントがありません。';
+    accountsListEl.innerHTML = '該当するユーザーがいません。';
     return;
   }
 
@@ -208,34 +224,29 @@ function renderAccounts(filterText) {
 
   filtered.forEach((a) => {
     const u = a.omikujiData;
-    const counts = u ? countByRarity(u.achievements) : null;
+    const counts = countByRarity(u.achievements);
     const tr = document.createElement('tr');
     const actionBtnStyle = 'width:auto; display:inline-block; box-sizing:border-box; padding:6px 14px; font-size:0.8rem; font-weight:normal; line-height:1.4; border-radius:20px;';
     const actionsCell = `
       <td style="white-space:nowrap;">
         <div style="display:flex; gap:6px; flex-wrap:nowrap;">
-          ${u ? `<button class="primary-btn" style="${actionBtnStyle}" data-action="edit">編集</button>` : ''}
-          <button class="danger-btn" style="${actionBtnStyle}" data-action="delete">削除</button>
+          <button class="primary-btn" style="${actionBtnStyle}" data-action="edit">編集</button>
+          ${a.isRegistered ? `<button class="danger-btn" style="${actionBtnStyle}" data-action="delete">登録解除</button>` : ''}
         </div>
       </td>
     `;
-    tr.innerHTML = u ? `
+    tr.innerHTML = `
       <td>${escapeHtml(u.name || '(無記名)')}</td>
-      <td style="white-space:nowrap;">${escapeHtml(a.loginId)}</td>
+      <td style="white-space:nowrap;">${escapeHtml(a.loginId || '-')}</td>
       <td style="white-space:nowrap;">${escapeHtml(u.birthday || '-')}</td>
       <td style="white-space:nowrap;">${counts.bronze}</td>
       <td style="white-space:nowrap;">${counts.silver}</td>
       <td style="white-space:nowrap;">${counts.gold}</td>
       <td style="white-space:nowrap;">${counts.legend}</td>
       ${actionsCell}
-    ` : `
-      <td colspan="7" style="color:var(--danger);">紐づくomikujiデータが見つかりません（登録ID: ${escapeHtml(a.loginId)}／UID: ${escapeHtml(a.omikujiUserId)}）</td>
-      ${actionsCell}
     `;
-    if (u) {
-      tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
-    }
-    tr.querySelector('[data-action="delete"]').addEventListener('click', () => deleteAccountLink(a));
+    tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
+    tr.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteAccountLink(a));
     tbody.appendChild(tr);
   });
 
@@ -244,10 +255,11 @@ function renderAccounts(filterText) {
 }
 
 async function deleteAccountLink(a) {
-  const label = a.loginId || a.authUid;
-  if (!confirm(`登録ID「${label}」の紐づけを削除します。\n\n※ Firebase Authのアカウントやomikujiのデータ自体は消えません。この登録情報(accountLinks)だけを削除します。\n\nよろしいですか？`)) return;
+  if (!confirm(`登録ID「${a.loginId}」の登録を解除します。\n\n※ Firebase Authのアカウントやomikujiのデータ自体は消えません。この登録情報(accountLinks)だけを削除します。\n\nよろしいですか？`)) return;
   await deleteDoc(doc(db, 'accountLinks', a.authUid));
-  allAccounts = allAccounts.filter((x) => x.authUid !== a.authUid);
+  a.authUid = null;
+  a.loginId = '';
+  a.isRegistered = false;
   renderAccounts(accountsFilterEl.value);
 }
 

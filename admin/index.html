@@ -50,9 +50,13 @@
   </section>
 
   <section class="section" id="accounts-section">
-    <div class="section-title">登録済みアカウント一覧</div>
-    <p class="section-desc">AccountCenterでID+パスワード登録した全ユーザーの一覧です。下の欄に入力すると一覧を絞り込みます（一覧は最初に一度だけ全件読み込み、以降はその場で絞り込むだけなので通信は発生しません）。</p>
+    <div class="section-title">ユーザー一覧</div>
+    <p class="section-desc">omikujiUsers全体から最終更新日が新しい順に一定件数を読み込みます（登録・未登録どちらも対象）。下の欄に入力すると一覧を絞り込みます（一覧は最初に一度だけ読み込み、以降はその場で絞り込むだけなので通信は発生しません）。</p>
     <button id="reload-accounts-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+    <div class="radio-row" style="margin-bottom:10px;">
+      <label><input type="checkbox" id="accounts-filter-registered" checked> 登録済みユーザー</label>
+      <label><input type="checkbox" id="accounts-filter-unregistered"> 未登録ユーザー</label>
+    </div>
     <div class="input-group">
       <label for="accounts-filter">絞り込み（登録ID・名前）</label>
       <input type="text" id="accounts-filter" placeholder="入力するとリアルタイムで絞り込みます">
