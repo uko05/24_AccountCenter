@@ -8,6 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const ACCOUNTS_LOAD_LIMIT = 100;
+const ACCOUNTS_FETCH_LIMIT = 300;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 
 const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
@@ -159,8 +160,10 @@ accountsFilterUnregisteredEl.addEventListener('change', () => renderAccounts(acc
 async function loadAccounts() {
   accountsListEl.innerHTML = '読み込み中…';
 
+  // 1度もおみくじを引いたことがない(achStats.totalCountが0)人を除外した上で100件にしたいので、
+  // 多めに取得してからフィルタ・切り詰める(除外分を考慮した複合インデックス作成を避けるため)。
   const [usersSnap, linkSnap] = await Promise.all([
-    getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'), limit(ACCOUNTS_LOAD_LIMIT))),
+    getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'), limit(ACCOUNTS_FETCH_LIMIT))),
     getDocs(collection(db, 'accountLinks')),
   ]);
 
@@ -170,16 +173,19 @@ async function loadAccounts() {
     if (link.omikujiUserId) linkByOmikujiId.set(link.omikujiUserId, { ...link, authUid: linkDoc.id });
   });
 
-  allAccounts = usersSnap.docs.map((userDoc) => {
-    const link = linkByOmikujiId.get(userDoc.id);
-    return {
-      omikujiUserId: userDoc.id,
-      authUid: link?.authUid || null,
-      loginId: link?.loginId || '',
-      isRegistered: !!link,
-      omikujiData: userDoc.data(),
-    };
-  });
+  allAccounts = usersSnap.docs
+    .filter((userDoc) => (userDoc.data().achStats?.totalCount || 0) > 0)
+    .slice(0, ACCOUNTS_LOAD_LIMIT)
+    .map((userDoc) => {
+      const link = linkByOmikujiId.get(userDoc.id);
+      return {
+        omikujiUserId: userDoc.id,
+        authUid: link?.authUid || null,
+        loginId: link?.loginId || '',
+        isRegistered: !!link,
+        omikujiData: userDoc.data(),
+      };
+    });
 
   renderAccounts(accountsFilterEl.value);
 }
