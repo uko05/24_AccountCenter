@@ -210,7 +210,7 @@ function renderAccounts(filterText) {
       <tr>
         <th style="width:auto;">名前</th>
         <th style="width:30%; white-space:nowrap;">登録ID</th>
-        <th style="width:1%; white-space:nowrap;">誕生日</th>
+        <th style="width:1%; white-space:nowrap;">最終更新日時</th>
         <th style="width:1%; white-space:nowrap;">銅</th>
         <th style="width:1%; white-space:nowrap;">銀</th>
         <th style="width:1%; white-space:nowrap;">金</th>
@@ -238,7 +238,7 @@ function renderAccounts(filterText) {
     tr.innerHTML = `
       <td>${escapeHtml(u.name || '(無記名)')}</td>
       <td style="white-space:nowrap;">${escapeHtml(a.loginId || '-')}</td>
-      <td style="white-space:nowrap;">${escapeHtml(u.birthday || '-')}</td>
+      <td style="white-space:nowrap;">${fmtTimestamp(u.updatedAt)}</td>
       <td style="white-space:nowrap;">${counts.bronze}</td>
       <td style="white-space:nowrap;">${counts.silver}</td>
       <td style="white-space:nowrap;">${counts.gold}</td>
