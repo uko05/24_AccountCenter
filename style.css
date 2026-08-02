@@ -121,7 +121,7 @@ main.wide { max-width: 980px; }
   letter-spacing: 0.03em;
 }
 
-.input-group input,
+.input-group input:not([type="checkbox"]):not([type="radio"]),
 .input-group textarea {
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -133,7 +133,13 @@ main.wide { max-width: 980px; }
   width: 100%;
 }
 
-.input-group input:focus,
+.input-group input[type="checkbox"],
+.input-group input[type="radio"] {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.input-group input:not([type="checkbox"]):not([type="radio"]):focus,
 .input-group textarea:focus { border-color: var(--accent); outline: none; }
 
 .input-group textarea { min-height: 90px; resize: vertical; }
