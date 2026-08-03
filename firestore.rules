@@ -244,7 +244,7 @@ service cloud.firestore {
     match /omikujiFeed/{feedId} {
       allow read: if true;
       allow create: if request.resource.data.likeCount == 0;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount']);
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount', 'avatarGame', 'avatarIcon']);
       allow delete: if isAdmin();
 
       // いいね重複防止（ドキュメントID = いいねした人のsharedUserId）
