@@ -62,6 +62,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // 原神クイズ王・原神ズームアップ（旧genshinquiz-eb690から統合。匿名・認証不要）
+    match /quizState/current {
+      allow read, write: if true;
+    }
+    match /quizZoomState/current {
+      allow read, write: if true;
+    }
+    match /quizAnswers/{id} {
+      allow read, write: if true;
+    }
+    match /quizMessages/{id} {
+      allow read, write: if true;
+    }
+
     // Bunpuzu お題収集（手入力タイトルの収集用。書き込み専用・読み取り不可）
     match /bunpuzuOdai/{doc} {
       allow read: if false;
