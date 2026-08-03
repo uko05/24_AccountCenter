@@ -247,10 +247,11 @@ service cloud.firestore {
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount', 'avatarGame', 'avatarIcon']);
       allow delete: if isAdmin();
 
-      // いいね重複防止（ドキュメントID = いいねした人のsharedUserId）
+      // いいね重複防止（ドキュメントID = いいねした人のsharedUserId）。
+      // 匿名運用のためomikujiUsers等と同じくオープン。deleteはデバッガー/管理者ロールの
+      // 「いいね取り消し」用（このコレクション自体、他フィールドも同様に無認証で信頼している）。
       match /likes/{likerUserId} {
-        allow read, create: if true;
-        allow update, delete: if isAdmin();
+        allow read, create, delete: if true;
       }
     }
 
