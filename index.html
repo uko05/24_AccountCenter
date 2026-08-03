@@ -82,6 +82,23 @@
     </div>
   </section>
 
+  <section class="section hidden" id="avatar-section">
+    <div class="section-title" data-i18n="avatarTitle">アバターアイコン設定</div>
+    <p class="section-desc" data-i18n="avatarDesc">原神・スタレのキャラクターを選んで、おみくじサイトなどで表示される丸型アイコンを設定できます。</p>
+
+    <div class="avatar-preview-row">
+      <img id="avatar-current-preview" class="avatar-current-preview" alt="">
+    </div>
+
+    <div class="avatar-game-tab-bar" id="avatar-game-tabs">
+      <button type="button" class="avatar-game-tab-btn active" data-game="genshin" data-i18n="avatarGenshinTab">原神</button>
+      <button type="button" class="avatar-game-tab-btn" data-game="starrail" data-i18n="avatarStarrailTab">スタレ</button>
+    </div>
+    <div class="avatar-elem-tab-bar" id="avatar-elem-tabs"></div>
+    <div class="avatar-char-list" id="avatar-char-list"></div>
+    <p id="avatar-msg" class="form-msg"></p>
+  </section>
+
   <section class="section" id="merge-section">
     <div class="section-title" data-i18n="mergeTitle">機種変した方はこちら</div>
     <p class="section-desc" data-i18n="mergeDesc">

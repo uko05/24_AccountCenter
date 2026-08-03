@@ -6,6 +6,8 @@ import {
 import {
   doc, setDoc, getDoc, collection, addDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { genshinChars } from 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/01_Genshin/chara_data/genshin_chars.js';
+import { starrailChars } from 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/02_Starrail/chara_data/starrail_chars.js';
 
 const LS_OMIKUJI_UID = 'genshinOmikuji_userId';
 const AUTH_EMAIL_SUFFIX = '@uko05.internal';
@@ -13,6 +15,10 @@ const AUTH_EMAIL_SUFFIX = '@uko05.internal';
 const ADMIN_UID = 'UPInlRxp2eM8OI3p18UU1d3OzNc2';
 
 const auth = getAuth(app);
+
+const GENSHIN_ICON_BASE  = 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/01_Genshin/chara_icon/';
+const STARRAIL_ICON_BASE = 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/02_Starrail/chara_icon/';
+const DEFAULT_AVATAR_URL = 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/image/sonota.png';
 
 // ===== i18n =====
 const i18n = {
@@ -44,6 +50,12 @@ const i18n = {
     mergeContactDesc: '名前を入力せずに占っていた方・上記が当てはまらない方は、下のリンクから直接連絡してください。',
     sadLabel: '＜友達ください…',
     adminPanelLink: '管理者画面を開く',
+
+    avatarTitle: 'アバターアイコン設定',
+    avatarDesc: '原神・スタレのキャラクターを選んで、おみくじサイトなどで表示される丸型アイコンを設定できます。',
+    avatarGenshinTab: '原神',
+    avatarStarrailTab: 'スタレ',
+    avatarSaveOk: 'アイコンを設定しました。',
 
     msgFillIdPw: 'IDとパスワードを入力してください。',
     msgNeedOmikujiFirst: '先におみくじサイトを一度使ってから登録してください。',
@@ -89,6 +101,12 @@ const i18n = {
     sadLabel: '< Follow me on X!',
     adminPanelLink: 'Open admin panel',
 
+    avatarTitle: 'Avatar icon',
+    avatarDesc: 'Pick a Genshin or Star Rail character to use as your round avatar icon, shown on the omikuji site and others.',
+    avatarGenshinTab: 'Genshin',
+    avatarStarrailTab: 'Star Rail',
+    avatarSaveOk: 'Avatar saved.',
+
     msgFillIdPw: 'Please enter an ID and password.',
     msgNeedOmikujiFirst: 'Please use the omikuji site once before registering.',
     msgRegisterOk: 'Registration complete. Your data on this device is unchanged.',
@@ -124,6 +142,7 @@ function applyLang(lang) {
   });
 
   uidBox.textContent = getCurrentOmikujiUid() || t('uidNone');
+  if (!avatarSection.classList.contains('hidden')) { renderElemTabs(); renderCharList(); }
 }
 
 function initLangSwitch() {
@@ -279,10 +298,128 @@ mergeBtn.addEventListener('click', async () => {
   }
 });
 
-// ===== 管理者ログイン中のみ管理画面リンクを表示 =====
+// ===== アバターアイコン設定 =====
+const ELEM_LABELS = {
+  ja: { hi: '炎', mizu: '水', koori: '氷', kaminari: '雷', kusa: '草', kaze: '風', iwa: '岩', kyosuu: '虚数', ryoushi: '量子', butsuri: '物理' },
+  en: { hi: 'Fire', mizu: 'Hydro', koori: 'Ice', kaminari: 'Lightning', kusa: 'Dendro', kaze: 'Wind', iwa: 'Geo', kyosuu: 'Imaginary', ryoushi: 'Quantum', butsuri: 'Physical' },
+};
+const GAME_ELEMS = {
+  genshin:  ['hi', 'mizu', 'koori', 'kaminari', 'kusa', 'kaze', 'iwa'],
+  starrail: ['hi', 'koori', 'kaze', 'kaminari', 'kyosuu', 'ryoushi', 'butsuri'],
+};
+const GAME_CHARS = { genshin: genshinChars, starrail: starrailChars };
+const GAME_ICON_BASE = { genshin: GENSHIN_ICON_BASE, starrail: STARRAIL_ICON_BASE };
+
+const avatarSection  = document.getElementById('avatar-section');
+const avatarPreview  = document.getElementById('avatar-current-preview');
+const avatarGameTabs = document.getElementById('avatar-game-tabs');
+const avatarElemTabs = document.getElementById('avatar-elem-tabs');
+const avatarCharList = document.getElementById('avatar-char-list');
+const avatarMsg      = document.getElementById('avatar-msg');
+
+let avatarGame = 'genshin';
+let avatarElem = GAME_ELEMS.genshin[0];
+let avatarOmikujiUid = null;
+
+function avatarIconUrl(game, icon) {
+  return `${GAME_ICON_BASE[game]}${icon}`;
+}
+
+function setAvatarPreview(game, icon) {
+  avatarPreview.src = (game && icon) ? avatarIconUrl(game, icon) : DEFAULT_AVATAR_URL;
+}
+
+function renderElemTabs() {
+  avatarElemTabs.innerHTML = '';
+  GAME_ELEMS[avatarGame].forEach((elem, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'avatar-elem-tab-btn' + (i === 0 ? ' active' : '');
+    btn.dataset.elem = elem;
+    btn.textContent = ELEM_LABELS[currentLang][elem];
+    btn.addEventListener('click', () => {
+      avatarElemTabs.querySelectorAll('.avatar-elem-tab-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      avatarElem = elem;
+      renderCharList();
+    });
+    avatarElemTabs.appendChild(btn);
+  });
+  avatarElem = GAME_ELEMS[avatarGame][0];
+}
+
+function renderCharList() {
+  avatarCharList.innerHTML = '';
+  const chars = GAME_CHARS[avatarGame].filter((c) => c.element === avatarElem);
+  chars.forEach((c) => {
+    const name = c.name || c.icon.replace(/\.\w+$/, '');
+    const thumb = document.createElement('button');
+    thumb.type = 'button';
+    thumb.className = 'avatar-char-thumb';
+    thumb.title = name;
+    const img = document.createElement('img');
+    img.src = avatarIconUrl(avatarGame, c.icon);
+    img.alt = name;
+    img.loading = 'lazy';
+    thumb.appendChild(img);
+    thumb.addEventListener('click', () => selectAvatar(avatarGame, c.icon));
+    avatarCharList.appendChild(thumb);
+  });
+}
+
+avatarGameTabs.querySelectorAll('.avatar-game-tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    avatarGameTabs.querySelectorAll('.avatar-game-tab-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    avatarGame = btn.dataset.game;
+    renderElemTabs();
+    renderCharList();
+  });
+});
+
+async function selectAvatar(game, icon) {
+  if (!avatarOmikujiUid) return;
+  try {
+    await setDoc(doc(db, 'userAvatars', avatarOmikujiUid), {
+      game, icon, updatedAt: serverTimestamp(),
+    });
+    setAvatarPreview(game, icon);
+    showMsg(avatarMsg, t('avatarSaveOk'), false);
+  } catch (e) {
+    showMsg(avatarMsg, `${t('errGeneric')}（${e.code || e.message}）`, true);
+  }
+}
+
+async function loadAvatarSection(authUid) {
+  const linkSnap = await getDoc(doc(db, 'accountLinks', authUid));
+  if (!linkSnap.exists() || !linkSnap.data().omikujiUserId) {
+    avatarSection.classList.add('hidden');
+    avatarOmikujiUid = null;
+    return;
+  }
+  avatarOmikujiUid = linkSnap.data().omikujiUserId;
+  avatarSection.classList.remove('hidden');
+
+  const avatarSnap = await getDoc(doc(db, 'userAvatars', avatarOmikujiUid));
+  if (avatarSnap.exists()) {
+    setAvatarPreview(avatarSnap.data().game, avatarSnap.data().icon);
+  } else {
+    setAvatarPreview(null, null);
+  }
+  renderElemTabs();
+  renderCharList();
+}
+
+// ===== 管理者ログイン中のみ管理画面リンクを表示、ログイン中はアバター設定を表示 =====
 const adminPanelLink = document.getElementById('admin-panel-link');
 onAuthStateChanged(auth, (user) => {
   adminPanelLink.classList.toggle('hidden', !(user && user.uid === ADMIN_UID));
+  if (user) {
+    loadAvatarSection(user.uid);
+  } else {
+    avatarSection.classList.add('hidden');
+    avatarOmikujiUid = null;
+  }
 });
 
 initLangSwitch();

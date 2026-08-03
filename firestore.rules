@@ -240,6 +240,35 @@ service cloud.firestore {
         && request.resource.data.winCount <= resource.data.winCount + 1;
     }
 
+    // GenshinOmikuji みんなの結果フィード（24時間以内の占い結果一覧。匿名運用のためomikujiUsersと同じくオープン）
+    match /omikujiFeed/{feedId} {
+      allow read: if true;
+      allow create: if request.resource.data.likeCount == 0;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likeCount']);
+      allow delete: if isAdmin();
+
+      // いいね重複防止（ドキュメントID = いいねした人のsharedUserId）
+      match /likes/{likerUserId} {
+        allow read, create: if true;
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // GenshinOmikuji いいね通知（トースト表示＋履歴パネル兼用）
+    match /omikujiLikeNotifications/{notifId} {
+      allow read, create: if true;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shown']);
+      allow delete: if isAdmin();
+    }
+
+    // うこ氏サイト群共通アバター設定。sharedUserId(=omikuji UID)をキーにする。
+    // 読み取りは誰でも可、書き込みはaccountLinksで紐付いた本人(Firebase Auth必須)のみ。
+    match /userAvatars/{sharedUserId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && get(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.omikujiUserId == sharedUserId;
+    }
+
     // その他すべて拒否
     match /{document=**} {
       allow read, write: if false;

@@ -305,6 +305,93 @@ table.user-table th { background: var(--surface2); }
 
 .hidden { display: none !important; }
 
+/* ===== アバターアイコン設定 ===== */
+.avatar-preview-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.avatar-current-preview {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+  background: var(--surface2);
+}
+.avatar-game-tab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.avatar-game-tab-btn {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+.avatar-game-tab-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: bold;
+}
+.avatar-elem-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.avatar-elem-tab-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  padding: 4px 12px;
+}
+.avatar-elem-tab-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text);
+  font-weight: bold;
+}
+.avatar-char-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--surface2);
+  border-radius: 8px;
+}
+.avatar-char-thumb {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.avatar-char-thumb:hover { border-color: rgba(255, 204, 0, 0.6); }
+.avatar-char-thumb img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
 @media (max-width: 480px) {
   .candidate-item { flex-direction: column; align-items: flex-start; }
 }
