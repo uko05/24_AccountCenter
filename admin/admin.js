@@ -221,8 +221,8 @@ function renderAccounts(filterText) {
         <th style="width:1%; white-space:nowrap;">銀</th>
         <th style="width:1%; white-space:nowrap;">金</th>
         <th style="width:1%; white-space:nowrap;">虹</th>
-        <th style="width:1%; white-space:nowrap;">もらいいいね</th>
-        <th style="width:1%; white-space:nowrap;">あげいいね</th>
+        <th style="width:1%; white-space:nowrap;">アゲ</th>
+        <th style="width:1%; white-space:nowrap;">モラ</th>
         <th style="width:1%; white-space:nowrap;"></th>
       </tr>
     </thead>
@@ -251,8 +251,8 @@ function renderAccounts(filterText) {
       <td style="white-space:nowrap;">${counts.silver}</td>
       <td style="white-space:nowrap;">${counts.gold}</td>
       <td style="white-space:nowrap;">${counts.legend}</td>
-      <td style="white-space:nowrap;">${u.totalLikesReceived ?? 0}</td>
       <td style="white-space:nowrap;">${u.totalLikesGiven ?? 0}</td>
+      <td style="white-space:nowrap;">${u.totalLikesReceived ?? 0}</td>
       ${actionsCell}
     `;
     tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
