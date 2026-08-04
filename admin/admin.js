@@ -151,6 +151,20 @@ const accountsFilterEl = document.getElementById('accounts-filter');
 const accountsFilterRegisteredEl = document.getElementById('accounts-filter-registered');
 const accountsFilterUnregisteredEl = document.getElementById('accounts-filter-unregistered');
 let allAccounts = [];
+let accountsSortKey = null;
+let accountsSortDir = 1; // 1=昇順, -1=降順
+
+const ACCOUNTS_SORT_COLUMNS = {
+  name:      { label: '名前',         width: 'auto', get: (r) => r.u.name || '' },
+  loginId:   { label: '登録ID',       width: '21%',  get: (r) => r.a.loginId || '' },
+  updatedAt: { label: '最終更新日時', width: '1%',   get: (r) => r.u.updatedAt?.toMillis?.() ?? 0 },
+  bronze:    { label: '銅',           width: '1%',   get: (r) => r.counts.bronze },
+  silver:    { label: '銀',           width: '1%',   get: (r) => r.counts.silver },
+  gold:      { label: '金',           width: '1%',   get: (r) => r.counts.gold },
+  legend:    { label: '虹',           width: '1%',   get: (r) => r.counts.legend },
+  given:     { label: 'アゲ',         width: '1%',   get: (r) => r.u.totalLikesGiven ?? 0 },
+  received:  { label: 'モラ',         width: '1%',   get: (r) => r.u.totalLikesReceived ?? 0 },
+};
 
 document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
 accountsFilterEl.addEventListener('input', () => renderAccounts(accountsFilterEl.value));
@@ -209,20 +223,29 @@ function renderAccounts(filterText) {
     return;
   }
 
+  let rows = filtered.map((a) => ({ a, u: a.omikujiData, counts: countByRarity(a.omikujiData.achievements) }));
+
+  if (accountsSortKey) {
+    const getter = ACCOUNTS_SORT_COLUMNS[accountsSortKey].get;
+    rows = rows.slice().sort((x, y) => {
+      const vx = getter(x), vy = getter(y);
+      if (vx < vy) return -1 * accountsSortDir;
+      if (vx > vy) return 1 * accountsSortDir;
+      return 0;
+    });
+  }
+
+  const sortArrow = (key) => (accountsSortKey === key ? (accountsSortDir === 1 ? ' ▲' : ' ▼') : '');
+  const headerCells = Object.entries(ACCOUNTS_SORT_COLUMNS).map(([key, col]) => `
+    <th data-sort-key="${key}" style="width:${col.width}; white-space:nowrap; cursor:pointer; user-select:none;">${col.label}${sortArrow(key)}</th>
+  `).join('');
+
   const table = document.createElement('table');
   table.className = 'user-table';
   table.innerHTML = `
     <thead>
       <tr>
-        <th style="width:auto;">名前</th>
-        <th style="width:30%; white-space:nowrap;">登録ID</th>
-        <th style="width:1%; white-space:nowrap;">最終更新日時</th>
-        <th style="width:1%; white-space:nowrap;">銅</th>
-        <th style="width:1%; white-space:nowrap;">銀</th>
-        <th style="width:1%; white-space:nowrap;">金</th>
-        <th style="width:1%; white-space:nowrap;">虹</th>
-        <th style="width:1%; white-space:nowrap;">アゲ</th>
-        <th style="width:1%; white-space:nowrap;">モラ</th>
+        ${headerCells}
         <th style="width:1%; white-space:nowrap;"></th>
       </tr>
     </thead>
@@ -230,9 +253,7 @@ function renderAccounts(filterText) {
   `;
   const tbody = table.querySelector('tbody');
 
-  filtered.forEach((a) => {
-    const u = a.omikujiData;
-    const counts = countByRarity(u.achievements);
+  rows.forEach(({ a, u, counts }) => {
     const tr = document.createElement('tr');
     const actionBtnStyle = 'width:auto; display:inline-block; box-sizing:border-box; padding:6px 14px; font-size:0.8rem; font-weight:normal; line-height:1.4; border-radius:20px;';
     const actionsCell = `
@@ -258,6 +279,19 @@ function renderAccounts(filterText) {
     tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
     tr.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteAccountLink(a));
     tbody.appendChild(tr);
+  });
+
+  table.querySelectorAll('th[data-sort-key]').forEach((th) => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sortKey;
+      if (accountsSortKey === key) {
+        accountsSortDir *= -1;
+      } else {
+        accountsSortKey = key;
+        accountsSortDir = 1;
+      }
+      renderAccounts(accountsFilterEl.value);
+    });
   });
 
   accountsListEl.innerHTML = '';
