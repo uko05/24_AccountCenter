@@ -255,6 +255,13 @@ service cloud.firestore {
       }
     }
 
+    // 上のomikujiFeed/{feedId}/likesと同一ルールをcollectionGroupクエリ用に再掲。
+    // ネストしたmatchは通常のパス指定アクセスにしか適用されず、collectionGroup()での
+    // 横断検索には{path=**}形式のトップレベルmatchが別途必要なため。
+    match /{path=**}/likes/{likerUserId} {
+      allow read, create, delete: if true;
+    }
+
     // GenshinOmikuji いいね通知（トースト表示＋履歴パネル兼用）
     match /omikujiLikeNotifications/{notifId} {
       allow read, create: if true;
@@ -268,6 +275,27 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null
         && get(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.omikujiUserId == sharedUserId;
+    }
+
+    // ===== 25_FriendBoard（フレンド募集掲示板） =====
+    // 匿名運用のためomikujiUsers等と同じくオープン。
+    // 承認制(secretFieldKeys指定)の項目は、そもそもfriendBoardPosts/friendBoardApplications
+    // 作成時にクライアント側が値を書き込まない設計にしており、ここでの制限はしていない
+    // （このサイト群全体の方針に合わせ、無認証・匿名信頼モデルのまま統一している）。
+
+    // プロフィール本体（UID・サーバー・推しキャラ等、項目ごとの公開設定を含む）
+    match /friendBoardProfiles/{userId} {
+      allow read, write: if true;
+    }
+
+    // 募集投稿
+    match /friendBoardPosts/{postId} {
+      allow read, write: if true;
+    }
+
+    // 募集への申請（申請・承認・却下・通知既読フラグ）
+    match /friendBoardApplications/{appId} {
+      allow read, write: if true;
     }
 
     // その他すべて拒否
