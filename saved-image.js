@@ -21,7 +21,7 @@
  *   - 共有匿名ID = localStorage['genshinOmikuji_userId'](14_GenshinOmikuji/25_FriendBoard等と同じキー)
  *
  * 保存先:
- *   Storage:   savedImages/{siteId}/{sharedUserId}.png
+ *   Storage:   savedImages/{siteId}/{sharedUserId}/image.png
  *   Firestore: savedProfileImages/{sharedUserId} = { [siteId]: { url, updatedAt } }
  * ルールは userAvatars/{sharedUserId} と同型（accountLinks経由で本人のみ書き込み可）。
  */
@@ -80,7 +80,7 @@ export async function saveProfileImage(siteId, blob) {
 
   try {
     const sharedUserId = getSharedUserId();
-    const storageRef = ref(storage, `savedImages/${siteId}/${sharedUserId}.png`);
+    const storageRef = ref(storage, `savedImages/${siteId}/${sharedUserId}/image.png`);
     await uploadBytes(storageRef, blob, { contentType: 'image/png' });
     const url = await getDownloadURL(storageRef);
     await setDoc(doc(db, 'savedProfileImages', sharedUserId), {
