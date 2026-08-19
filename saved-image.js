@@ -12,9 +12,15 @@
  *   const entry = await getSavedProfileImage('genshinRanking'); // { url, updatedAt } | null
  *   if (entry) formatSavedAt(entry.updatedAt); // "2026/08/19 12:34" 形式の文字列
  *
- * 呼び出し元サイトの既定Firebaseプロジェクトが genshin-bakatare01 でも別プロジェクト
- * (例: starrail-bakatare02)でも同じように動くよう、このモジュール専用の名前付きApp
- * ('ukoSavedImage')で常に genshin-bakatare01 に接続する(10_connectの'connect10'と同じ技法)。
+ * ログイン検知の仕組み(重要): Firebase Authの永続化キーは apiKey に加えて
+ * Appのインスタンス名(既定Appなら'[DEFAULT]')ごとに分かれる。24_AccountCenterでの
+ * ログインは各サイトの「既定(無名)App」で行われる想定なので、呼び出し元サイトの既定Appが
+ * 既に genshin-bakatare01 を指している場合(01_TiersList/06_GenshinCheck等)は、
+ * その既定Appをそのまま使い回すことでログインセッションを正しく共有できる。
+ * 一方、呼び出し元サイトの既定Appが別プロジェクト(例: 02/03_TiersList・07_StarRailCheckの
+ * starrail-bakatare02)の場合は、名前付きApp('ukoSavedImage')でgenshin-bakatare01へ
+ * 接続するしかなく、この場合は既定Appのログインセッションを自動では共有できない
+ * (＝これらのサイトでは今のところ本機能がログイン状態を検知できない制約が残る)。
  *
  * ログイン判定・共有匿名IDは他サイトと同じ仕組みを踏襲する:
  *   - ログイン = 24_AccountCenterでID/パスワード登録済み(Firebase Authのemailログイン)
@@ -44,8 +50,17 @@ const firebaseConfig = {
 };
 
 const APP_NAME = 'ukoSavedImage';
-const hasApp = getApps().some((a) => a.name === APP_NAME);
-const app = hasApp ? getApp(APP_NAME) : initializeApp(firebaseConfig, APP_NAME);
+const hasDefaultApp = getApps().some((a) => a.name === '[DEFAULT]');
+const defaultAppIsGenshinBakatare01 = hasDefaultApp && getApp().options.projectId === 'genshin-bakatare01';
+
+let app;
+if (defaultAppIsGenshinBakatare01) {
+  // 呼び出し元サイトの既定Appが既にgenshin-bakatare01 → それを使い回してログイン共有
+  app = getApp();
+} else {
+  const hasApp = getApps().some((a) => a.name === APP_NAME);
+  app = hasApp ? getApp(APP_NAME) : initializeApp(firebaseConfig, APP_NAME);
+}
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
