@@ -124,6 +124,23 @@ export async function getSavedProfileImage(siteId) {
   return null;
 }
 
+// 任意のsharedUserId向けに保存画像を取得する(閲覧側がログインしているかは問わない、
+// Firestoreルールがsavedプロフィール画像を公開読み取り可としているため)。
+// 25_FriendBoardなどで「他人の投稿カードに保存画像を出す」用途に使う。
+export async function getSavedProfileImageFor(siteId, sharedUserId) {
+  if (!sharedUserId) return null;
+  try {
+    const snap = await getDoc(doc(db, 'savedProfileImages', sharedUserId));
+    if (snap.exists()) {
+      const entry = snap.data()[siteId];
+      if (entry && entry.url) return entry;
+    }
+  } catch (e) {
+    console.error('[saved-image] fetch (for) failed', e);
+  }
+  return null;
+}
+
 // FirestoreのTimestampを "yyyy/MM/dd HH:mm" 形式の文字列にする。
 export function formatSavedAt(timestamp) {
   if (!timestamp || typeof timestamp.toDate !== 'function') return '';
