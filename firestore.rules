@@ -277,6 +277,15 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.omikujiUserId == sharedUserId;
     }
 
+    // 推しキャラランキング/チェックシート各サイトで保存した画像(Storage)へのポインタ。
+    // sharedUserId(=omikuji UID)をキーにする。userAvatarsと同型のアクセス制御。
+    // { [siteId]: { url, updatedAt } } の形で、siteIdごとにサイト側が個別にmergeする。
+    match /savedProfileImages/{sharedUserId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && get(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.omikujiUserId == sharedUserId;
+    }
+
     // ===== 25_FriendBoard（フレンド募集掲示板） =====
     // 匿名運用のためomikujiUsers等と同じくオープン。
     // 承認制(secretFieldKeys指定)の項目は、そもそもfriendBoardPosts/friendBoardApplications

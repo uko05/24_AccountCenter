@@ -1,0 +1,24 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // 推しキャラランキング/チェックシート各サイトが保存する画像。
+    // savedImages/{siteId}/{sharedUserId}.png
+    // 読み取りは誰でも可(FriendBoardなどで表示するため)。
+    // 書き込みは、accountLinksで自分(request.auth.uid)がsharedUserIdに紐付いている
+    // 本人のみ(Firestoreのsaved-image.js側ルールと同じ考え方)。
+    // サイズ上限5MB・PNGのみに制限する。
+    match /savedImages/{siteId}/{sharedUserId}.png {
+      allow read: if true;
+      allow write: if request.auth != null
+        && firestore.get(/databases/(default)/documents/accountLinks/$(request.auth.uid)).data.omikujiUserId == sharedUserId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType == 'image/png';
+    }
+
+    // その他すべて拒否
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
