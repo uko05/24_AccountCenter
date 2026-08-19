@@ -37,6 +37,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // TiersList(スタレ運命/02) 票数。starrail-bakatare02から移行、01のbakatareCountsとは
+    // 別名にして02/03同士・01との衝突を避けている。
+    match /bakatareCounts02/{character} {
+      allow read:   if true;
+      allow create: if isValidVoteCreate();
+      allow update: if isValidVoteUpdate();
+      allow delete: if false;
+    }
+
+    // TiersList(スタレ属性/03) 票数
+    match /bakatareCounts03/{character} {
+      allow read:   if true;
+      allow create: if isValidVoteCreate();
+      allow update: if isValidVoteUpdate();
+      allow delete: if false;
+    }
+
+    // StarRailCheck(07) 票数。starrail-bakatare02から移行、06のcheckSheetVotesとは別名。
+    match /checkSheetVotes07/{questionId}/characters/{charId} {
+      allow read:   if true;
+      allow create: if isValidVoteCreate();
+      allow update: if isValidVoteUpdate();
+      allow delete: if false;
+    }
+
     // GenshinOmikuji ユーザーデータ＋占い統計（端末変更対応）
     match /omikujiUsers/{userId} {
       allow read, write: if true;
