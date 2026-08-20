@@ -30,6 +30,9 @@
  *   Storage:   savedImages/{siteId}/{sharedUserId}/image.png
  *   Firestore: savedProfileImages/{sharedUserId} = { [siteId]: { url, updatedAt } }
  * ルールは userAvatars/{sharedUserId} と同型（accountLinks経由で本人のみ書き込み可）。
+ * オブジェクト名は上記の通りimage.png固定(上書き保存)だが、ブラウザの「名前を付けて
+ * 画像を保存」で提案されるファイル名はcontentDispositionでImage_yyyyMMddHHmmss.pngに
+ * している(表示(<img>)には影響しない)。
  */
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
@@ -67,6 +70,17 @@ const storage = getStorage(app);
 
 const LS_SHARED_UID = 'genshinOmikuji_userId';
 
+// 保存先のオブジェクト名自体はimage.pngで固定(=保存し直すたびに上書きし、
+// Storage容量を増やさない)。一方、右クリック「名前を付けて画像を保存」時に
+// ブラウザが提案するファイル名はcontentDispositionで別途指定できるため、
+// そちらだけタイムスタンプ付きにして、複数サイトの画像をローカル保存した際に
+// 全部「image.png」で衝突・上書きされてしまうのを防ぐ。
+function timestampedFilename() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `Image_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`;
+}
+
 function getSharedUserId() {
   let id = localStorage.getItem(LS_SHARED_UID);
   if (!id) {
@@ -96,7 +110,10 @@ export async function saveProfileImage(siteId, blob) {
   try {
     const sharedUserId = getSharedUserId();
     const storageRef = ref(storage, `savedImages/${siteId}/${sharedUserId}/image.png`);
-    await uploadBytes(storageRef, blob, { contentType: 'image/png' });
+    await uploadBytes(storageRef, blob, {
+      contentType: 'image/png',
+      contentDisposition: `attachment; filename="${timestampedFilename()}"`,
+    });
     const url = await getDownloadURL(storageRef);
     await setDoc(doc(db, 'savedProfileImages', sharedUserId), {
       [siteId]: { url, updatedAt: serverTimestamp() },
