@@ -27,11 +27,11 @@
  *   - 共有匿名ID = localStorage['genshinOmikuji_userId'](14_GenshinOmikuji/25_FriendBoard等と同じキー)
  *
  * 保存先:
- *   Storage:   savedImages/{siteId}/{sharedUserId}/image.png
+ *   Storage:   savedImages/{siteId}/{sharedUserId}/image.jpg
  *   Firestore: savedProfileImages/{sharedUserId} = { [siteId]: { url, updatedAt } }
  * ルールは userAvatars/{sharedUserId} と同型（accountLinks経由で本人のみ書き込み可）。
- * オブジェクト名は上記の通りimage.png固定(上書き保存)だが、ブラウザの「名前を付けて
- * 画像を保存」で提案されるファイル名はcontentDispositionでImage_yyyyMMddHHmmss.pngに
+ * オブジェクト名は上記の通りimage.jpg固定(上書き保存)だが、ブラウザの「名前を付けて
+ * 画像を保存」で提案されるファイル名はcontentDispositionでImage_yyyyMMddHHmmss.jpgに
  * している(表示(<img>)には影響しない)。
  */
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
@@ -70,15 +70,15 @@ const storage = getStorage(app);
 
 const LS_SHARED_UID = 'genshinOmikuji_userId';
 
-// 保存先のオブジェクト名自体はimage.pngで固定(=保存し直すたびに上書きし、
+// 保存先のオブジェクト名自体はimage.jpgで固定(=保存し直すたびに上書きし、
 // Storage容量を増やさない)。一方、右クリック「名前を付けて画像を保存」時に
 // ブラウザが提案するファイル名はcontentDispositionで別途指定できるため、
 // そちらだけタイムスタンプ付きにして、複数サイトの画像をローカル保存した際に
-// 全部「image.png」で衝突・上書きされてしまうのを防ぐ。
+// 全部「image.jpg」で衝突・上書きされてしまうのを防ぐ。
 function timestampedFilename() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
-  return `Image_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.png`;
+  return `Image_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.jpg`;
 }
 
 function getSharedUserId() {
@@ -101,7 +101,7 @@ export function onAccountAuthState(callback) {
 }
 
 // siteId: 'genshinRanking' | 'starrailRankingPath' | 'starrailRankingElement' | 'genshinCheck' | 'starrailCheck'
-// blob: image/png のBlob(html2canvas → canvas.toBlob('image/png')の結果)
+// blob: image/jpeg のBlob(html2canvas → canvas.toBlob('image/jpeg', quality)の結果)
 // 未ログイン、失敗時はどちらも静かに諦める(呼び出し元のローカル保存/共有フローは絶対に壊さない)。
 export async function saveProfileImage(siteId, blob) {
   const user = auth.currentUser;
@@ -109,9 +109,9 @@ export async function saveProfileImage(siteId, blob) {
 
   try {
     const sharedUserId = getSharedUserId();
-    const storageRef = ref(storage, `savedImages/${siteId}/${sharedUserId}/image.png`);
+    const storageRef = ref(storage, `savedImages/${siteId}/${sharedUserId}/image.jpg`);
     await uploadBytes(storageRef, blob, {
-      contentType: 'image/png',
+      contentType: 'image/jpeg',
       contentDisposition: `attachment; filename="${timestampedFilename()}"`,
     });
     const url = await getDownloadURL(storageRef);
