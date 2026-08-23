@@ -31,8 +31,22 @@ const gateEl    = document.getElementById('admin-gate');
 const contentEl = document.getElementById('admin-content');
 const whoamiEl  = document.getElementById('admin-whoami');
 
-onAuthStateChanged(auth, (user) => {
-  const isAdmin = !!user && user.uid === ADMIN_UID;
+// 固定UID、または sharedUserRoles で管理者ロールが付与されたアカウントを管理者として扱う（firestore.rulesと合わせること）
+async function isEffectiveAdmin(user) {
+  if (!user) return false;
+  if (user.uid === ADMIN_UID) return true;
+  try {
+    const linkSnap = await getDoc(doc(db, 'accountLinks', user.uid));
+    if (!linkSnap.exists() || !linkSnap.data().omikujiUserId) return false;
+    const roleSnap = await getDoc(doc(db, 'sharedUserRoles', linkSnap.data().omikujiUserId));
+    return roleSnap.exists() && roleSnap.data().role === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+onAuthStateChanged(auth, async (user) => {
+  const isAdmin = await isEffectiveAdmin(user);
   gateEl.classList.toggle('hidden', isAdmin);
   contentEl.classList.toggle('hidden', !isAdmin);
   if (isAdmin) {

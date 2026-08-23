@@ -16,9 +16,16 @@ service cloud.firestore {
         && request.resource.data.updatedAt is timestamp;
     }
 
-    // AccountCenter 管理者判定
+    // AccountCenter 管理者判定（固定UID、または sharedUserRoles で管理者ロールが付与されたアカウント）
     function isAdmin() {
-      return request.auth != null && request.auth.uid == 'UPInlRxp2eM8OI3p18UU1d3OzNc2';
+      return request.auth != null && (
+        request.auth.uid == 'UPInlRxp2eM8OI3p18UU1d3OzNc2' || hasAdminRole()
+      );
+    }
+
+    function hasAdminRole() {
+      let sharedUserId = get(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.omikujiUserId;
+      return get(/databases/$(database)/documents/sharedUserRoles/$(sharedUserId)).data.role == 'admin';
     }
 
     // TiersList 票数
