@@ -202,9 +202,12 @@ let allAccounts = [];
 let accountsSortKey = null;
 let accountsSortDir = 1; // 1=昇順, -1=降順
 
+const ROLE_LABELS = { general: '一般', debugger: 'デバッガー', admin: '管理者' };
+
 const ACCOUNTS_SORT_COLUMNS = {
   name:      { label: '名前',         width: 'auto', get: (r) => r.u.name || '' },
-  loginId:   { label: '登録ID',       width: '21%',  get: (r) => r.a.loginId || '' },
+  loginId:   { label: '登録ID',       width: '18%',  get: (r) => r.a.loginId || '' },
+  role:      { label: 'ロール',       width: '1%',   get: (r) => r.a.role || 'general' },
   updatedAt: { label: '最終更新日時', width: '1%',   get: (r) => r.u.updatedAt?.toMillis?.() ?? 0 },
   bronze:    { label: '銅',           width: '1%',   get: (r) => r.counts.bronze },
   silver:    { label: '銀',           width: '1%',   get: (r) => r.counts.silver },
@@ -224,9 +227,10 @@ async function loadAccounts() {
 
   // 1度もおみくじを引いたことがない(achStats.totalCountが0)人を除外した上で100件にしたいので、
   // 多めに取得してからフィルタ・切り詰める(除外分を考慮した複合インデックス作成を避けるため)。
-  const [usersSnap, linkSnap] = await Promise.all([
+  const [usersSnap, linkSnap, roleSnap] = await Promise.all([
     getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'), limit(ACCOUNTS_FETCH_LIMIT))),
     getDocs(collection(db, 'accountLinks')),
+    getDocs(collection(db, 'sharedUserRoles')),
   ]);
 
   const linkByOmikujiId = new Map();
@@ -234,6 +238,9 @@ async function loadAccounts() {
     const link = linkDoc.data();
     if (link.omikujiUserId) linkByOmikujiId.set(link.omikujiUserId, { ...link, authUid: linkDoc.id });
   });
+
+  const roleByOmikujiId = new Map();
+  roleSnap.docs.forEach((roleDoc) => roleByOmikujiId.set(roleDoc.id, roleDoc.data().role || 'general'));
 
   allAccounts = usersSnap.docs
     .filter((userDoc) => (userDoc.data().achStats?.totalCount || 0) > 0)
@@ -245,6 +252,7 @@ async function loadAccounts() {
         authUid: link?.authUid || null,
         loginId: link?.loginId || '',
         isRegistered: !!link,
+        role: roleByOmikujiId.get(userDoc.id) || 'general',
         omikujiData: userDoc.data(),
       };
     });
@@ -303,18 +311,16 @@ function renderAccounts(filterText) {
 
   rows.forEach(({ a, u, counts }) => {
     const tr = document.createElement('tr');
-    const actionBtnStyle = 'width:auto; display:inline-block; box-sizing:border-box; padding:6px 14px; font-size:0.8rem; font-weight:normal; line-height:1.4; border-radius:20px;';
+    const actionBtnStyle = 'width:auto; display:inline-block; box-sizing:border-box; padding:4px 12px; font-size:0.74rem; font-weight:normal; line-height:1.4; border-radius:20px;';
     const actionsCell = `
       <td style="white-space:nowrap;">
-        <div style="display:flex; gap:6px; flex-wrap:nowrap;">
-          <button class="primary-btn" style="${actionBtnStyle}" data-action="edit">編集</button>
-          ${a.isRegistered ? `<button class="danger-btn" style="${actionBtnStyle}" data-action="delete">登録解除</button>` : ''}
-        </div>
+        <button class="primary-btn" style="${actionBtnStyle}" data-action="edit">編集</button>
       </td>
     `;
     tr.innerHTML = `
       <td>${escapeHtml(u.name || '(無記名)')}</td>
       <td style="white-space:nowrap;">${escapeHtml(a.loginId || '-')}</td>
+      <td style="white-space:nowrap;">${escapeHtml(ROLE_LABELS[a.role] || a.role)}</td>
       <td style="white-space:nowrap;">${fmtTimestamp(u.updatedAt)}</td>
       <td style="white-space:nowrap;">${counts.bronze}</td>
       <td style="white-space:nowrap;">${counts.silver}</td>
@@ -324,8 +330,7 @@ function renderAccounts(filterText) {
       <td style="white-space:nowrap;">${u.totalLikesReceived ?? 0}</td>
       ${actionsCell}
     `;
-    tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u));
-    tr.querySelector('[data-action="delete"]')?.addEventListener('click', () => deleteAccountLink(a));
+    tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u, a));
     tbody.appendChild(tr);
   });
 
@@ -412,12 +417,16 @@ document.getElementById('search-btn').addEventListener('click', async () => {
 
 // ===== 編集フォーム =====
 const editSection   = document.getElementById('edit-section');
-let currentEditUid   = null;
-let currentEditData  = null;
+let currentEditUid     = null;
+let currentEditData    = null;
+let currentEditAccount = null;
 
-async function openEditor(uid, data) {
+async function openEditor(uid, data, account = null) {
   currentEditUid = uid;
   currentEditData = data;
+  currentEditAccount = account;
+
+  document.getElementById('unregister-btn').classList.toggle('hidden', !account?.isRegistered);
 
   document.getElementById('edit-uid').textContent = uid;
   document.getElementById('edit-name').value = data.name || '';
@@ -473,6 +482,16 @@ document.getElementById('cancel-edit-btn').addEventListener('click', () => {
   editSection.classList.add('hidden');
   currentEditUid = null;
   currentEditData = null;
+  currentEditAccount = null;
+});
+
+document.getElementById('unregister-btn').addEventListener('click', async () => {
+  if (!currentEditAccount) return;
+  await deleteAccountLink(currentEditAccount);
+  editSection.classList.add('hidden');
+  currentEditUid = null;
+  currentEditData = null;
+  currentEditAccount = null;
 });
 
 document.getElementById('save-edit-btn').addEventListener('click', async () => {

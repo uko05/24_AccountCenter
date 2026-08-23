@@ -272,10 +272,10 @@ footer {
 
 .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
-table.user-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+table.user-table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
 table.user-table th, table.user-table td {
   border: 1px solid var(--border);
-  padding: 6px 8px;
+  padding: 4px 6px;
   text-align: left;
 }
 table.user-table th { background: var(--surface2); }

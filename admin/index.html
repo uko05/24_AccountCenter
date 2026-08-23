@@ -96,7 +96,10 @@
 
   <section class="section hidden" id="edit-section">
     <div class="section-title">ユーザー編集</div>
-    <div class="uid-box" id="edit-uid" style="margin-bottom:14px;"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div class="uid-box" id="edit-uid"></div>
+      <button id="unregister-btn" class="danger-btn hidden" style="width:auto; padding:7px 16px;">登録解除</button>
+    </div>
 
     <div class="input-group"><label>名前</label><input type="text" id="edit-name"></div>
     <div class="input-group"><label>誕生日</label><input type="date" id="edit-birthday"></div>
@@ -151,7 +154,7 @@
 
 </main>
 
-<script type="module" src="admin.js?v=5"></script>
+<script type="module" src="admin.js?v=6"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>
