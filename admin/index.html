@@ -42,6 +42,22 @@
     <button id="admin-logout-btn" class="secondary-btn">ログアウト</button>
   </div>
 
+  <section class="section" id="change-pw-section">
+    <div class="section-title">パスワード変更</div>
+    <form id="change-pw-form">
+      <div class="input-group">
+        <label for="change-pw-new">新しいパスワード</label>
+        <input type="password" id="change-pw-new" autocomplete="new-password" required>
+      </div>
+      <div class="input-group">
+        <label for="change-pw-confirm">新しいパスワード（確認）</label>
+        <input type="password" id="change-pw-confirm" autocomplete="new-password" required>
+      </div>
+      <button type="submit" class="primary-btn" style="width:auto; padding:9px 24px;">変更する</button>
+    </form>
+    <p id="change-pw-msg" class="form-msg"></p>
+  </section>
+
   <section class="section" id="requests-section">
     <div class="section-title">機種変申請キュー</div>
     <p class="section-desc">名前・誕生日をもとに候補を検索し、本人と判断できたら「このデータで引き継ぐ」を押してください。</p>
@@ -135,7 +151,7 @@
 
 </main>
 
-<script type="module" src="admin.js?v=3"></script>
+<script type="module" src="admin.js?v=4"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

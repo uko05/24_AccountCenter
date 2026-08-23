@@ -1,7 +1,7 @@
 // admin.js
 import { app, db } from '../firebaseConfig.js';
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   doc, getDoc, setDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, serverTimestamp,
@@ -60,6 +60,40 @@ document.getElementById('admin-login-form').addEventListener('submit', async (e)
 });
 
 document.getElementById('admin-logout-btn').addEventListener('click', () => signOut(auth));
+
+// ===== パスワード変更 =====
+document.getElementById('change-pw-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const newPw = document.getElementById('change-pw-new').value;
+  const newPwConfirm = document.getElementById('change-pw-confirm').value;
+  const msgEl = document.getElementById('change-pw-msg');
+  msgEl.classList.remove('ok', 'error');
+
+  if (newPw !== newPwConfirm) {
+    msgEl.textContent = '確認用パスワードが一致しません。';
+    msgEl.classList.add('error');
+    return;
+  }
+  if (newPw.length < 6) {
+    msgEl.textContent = 'パスワードは6文字以上にしてください。';
+    msgEl.classList.add('error');
+    return;
+  }
+
+  try {
+    await updatePassword(auth.currentUser, newPw);
+    msgEl.textContent = 'パスワードを変更しました。';
+    msgEl.classList.add('ok');
+    document.getElementById('change-pw-form').reset();
+  } catch (err) {
+    if (err.code === 'auth/requires-recent-login') {
+      msgEl.textContent = 'セッションが古いため変更できません。一度ログアウトしてから、現在のパスワードで再ログインした直後にもう一度お試しください。';
+    } else {
+      msgEl.textContent = `変更に失敗しました（${err.code || err.message}）`;
+    }
+    msgEl.classList.add('error');
+  }
+});
 
 // ===== 日付表示 =====
 function fmtTimestamp(ts) {
