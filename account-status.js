@@ -69,6 +69,12 @@ const css = `
     opacity: 0.75;
   }
   #uko-account-status button:hover { opacity: 1; }
+  #uko-account-status a {
+    color: #333;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  #uko-account-status a:hover { opacity: 0.75; }
 `;
 
 function ensureStyle() {
@@ -103,7 +109,7 @@ function renderBadge(loginId) {
   ensureStyle();
 
   const t = text[currentLang()];
-  slot.innerHTML = `<span id="uko-account-status"><span>${escapeHtml(t.loggedInAs(loginId))}</span><button type="button">${escapeHtml(t.logout)}</button></span>`;
+  slot.innerHTML = `<span id="uko-account-status"><a href="https://uko05.github.io/24_AccountCenter/" target="_blank" rel="noopener">${escapeHtml(t.loggedInAs(loginId))}</a><button type="button">${escapeHtml(t.logout)}</button></span>`;
   slot.querySelector('button').addEventListener('click', () => signOut(auth));
 }
 
