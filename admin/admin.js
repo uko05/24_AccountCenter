@@ -205,9 +205,10 @@ let accountsSortDir = 1; // 1=昇順, -1=降順
 const ROLE_LABELS = { general: '一般', debugger: 'デバッガー', admin: '管理者' };
 
 const ACCOUNTS_SORT_COLUMNS = {
-  name:      { label: '名前',         width: 'auto', get: (r) => r.u.name || '' },
+  name:      { label: '名前',         width: '20%',  get: (r) => r.u.name || '' },
   loginId:   { label: '登録ID',       width: '18%',  get: (r) => r.a.loginId || '' },
   role:      { label: 'ロール',       width: '1%',   get: (r) => r.a.role || 'general' },
+  birthday:  { label: '誕生日',       width: '20%',  get: (r) => r.u.birthday || '' },
   updatedAt: { label: '最終更新日時', width: '1%',   get: (r) => r.u.updatedAt?.toMillis?.() ?? 0 },
   bronze:    { label: '銅',           width: '1%',   get: (r) => r.counts.bronze },
   silver:    { label: '銀',           width: '1%',   get: (r) => r.counts.silver },
@@ -321,6 +322,7 @@ function renderAccounts(filterText) {
       <td>${escapeHtml(u.name || '(無記名)')}</td>
       <td style="white-space:nowrap;">${escapeHtml(a.loginId || '-')}</td>
       <td style="white-space:nowrap;">${escapeHtml(ROLE_LABELS[a.role] || a.role)}</td>
+      <td style="white-space:nowrap;">${escapeHtml(u.birthday || '-')}</td>
       <td style="white-space:nowrap;">${fmtTimestamp(u.updatedAt)}</td>
       <td style="white-space:nowrap;">${counts.bronze}</td>
       <td style="white-space:nowrap;">${counts.silver}</td>
