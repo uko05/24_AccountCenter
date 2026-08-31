@@ -411,98 +411,113 @@ table.user-table th { background: var(--surface2); }
   margin-bottom: 14px;
 }
 
-.ach-equipped-badge {
-  display: inline-block;
-  padding: 3px 12px;
-  border-radius: 999px;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  font-size: 0.85rem;
-  font-weight: bold;
+/* アチーブバッジ本体はコネクトバトルの称号バナー(title-slot-banner)と全く同じ
+   グラデーション・アニメーションを再現している。幅・高さは常に固定にして、
+   名前の長さで形がガタつかないようにする(はみ出す分は末尾を…で省略)。 */
+@keyframes ach-badge-shimmer {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
-.ach-equipped-badge.rarity-bronze { background: rgba(205,127,50,0.18); border-color: rgba(205,127,50,0.5); }
-.ach-equipped-badge.rarity-silver { background: rgba(168,184,200,0.25); border-color: rgba(168,184,200,0.6); }
-.ach-equipped-badge.rarity-gold   { background: rgba(212,168,0,0.18);  border-color: rgba(212,168,0,0.5); }
-.ach-equipped-badge.rarity-legend { background: rgba(155,89,182,0.18); border-color: rgba(155,89,182,0.5); }
-
-/* 一覧部分はコネクトバトルのアチーブ一覧(playerInfo.html)と同じデザインに揃えている。
-   幅・高さは常に固定(ach-set-btnの92px幅、ach-itemの一定パディング)で、
-   テキスト量によって形がガタつかないようにする。 */
-.ach-list { display: flex; flex-direction: column; gap: 10px; }
-
-.ach-group {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface2);
+@keyframes ach-badge-pulse-bronze {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(205,127,50,0.3); }
+  50%      { box-shadow: 0 0 10px 3px rgba(205,127,50,0.65); }
+}
+@keyframes ach-badge-pulse-silver {
+  0%, 100% { box-shadow: 0 0 4px 1px rgba(168,184,200,0.3); }
+  50%      { box-shadow: 0 0 10px 3px rgba(168,184,200,0.65); }
+}
+@keyframes ach-badge-glow-legend {
+  0%, 100% { box-shadow: 0 0 10px 2px rgba(155,89,182,0.4); }
+  50%      { box-shadow: 0 0 22px 7px rgba(155,89,182,0.75); }
 }
 
-.ach-group-header {
+.ach-badge {
+  position: relative;
   display: flex;
   align-items: center;
-  padding: 8px 12px;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 170px;
+  height: 46px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-family: var(--font);
+  font-size: 0.95rem;
   font-weight: bold;
+  color: white;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   cursor: pointer;
-  list-style: none;
-  user-select: none;
 }
-.ach-group-header::-webkit-details-marker { display: none; }
-.ach-group-header::after {
-  content: '▶';
-  font-size: 0.7em;
-  color: var(--muted);
-  margin-left: 8px;
-  transition: transform 0.2s;
-}
-details[open] > .ach-group-header::after { transform: rotate(90deg); }
 
-.ach-group-name { flex: 1; }
+.ach-badge.empty {
+  color: var(--muted);
+  background: var(--surface2);
+  border: 1px dashed var(--border);
+  font-weight: normal;
+  cursor: default;
+}
+
+.ach-badge.rarity-bronze {
+  background: linear-gradient(135deg, #a57e65, #cd7f32, #a57e65);
+  border: 1px solid #cd7f32;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
+  animation: ach-badge-pulse-bronze 3s ease-in-out infinite;
+}
+.ach-badge.rarity-silver {
+  background: linear-gradient(135deg, #757575, #9e9e9e, #757575);
+  border: 1px solid #a8b8c8;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
+  animation: ach-badge-pulse-silver 3s ease-in-out infinite;
+}
+.ach-badge.rarity-gold {
+  background: linear-gradient(45deg, #daaf08 0%, #daaf08 45%, #fee9a0 70%, #daaf08 85%, #daaf08 100%);
+  background-size: 800% 400%;
+  border: 1px solid #d4a800;
+  box-shadow: 0 0 10px 2px rgba(212,168,0,0.55);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.45);
+  animation: ach-badge-shimmer 5s infinite cubic-bezier(.62,.28,.23,.99);
+}
+.ach-badge.rarity-legend {
+  background: linear-gradient(45deg, #5a1090 0%, #8b3cc8 45%, #d4a8ff 70%, #8b3cc8 85%, #5a1090 100%);
+  background-size: 800% 400%;
+  border: 1px solid #9b59b6;
+  box-shadow: 0 0 10px 2px rgba(155,89,182,0.6);
+  text-shadow: 0 1px 6px rgba(200,150,255,0.7);
+  animation: ach-badge-shimmer 4s infinite cubic-bezier(.62,.28,.23,.99),
+             ach-badge-glow-legend 1.2s ease-in-out infinite;
+}
+
+.ach-badge-current { flex-shrink: 0; }
+
+.ach-badge.active { outline: 3px solid var(--accent); outline-offset: 2px; }
+.ach-badge.active::after {
+  content: '✓';
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ok);
+  color: white;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+}
+
+.ach-group-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: bold;
+  margin: 4px 0 2px;
+}
 .ach-group-count { color: var(--muted); font-weight: normal; font-size: 0.85em; }
 
-.ach-group-items { padding: 0 12px 8px; }
-
-.ach-item {
-  display: flex;
-  align-items: center;
-  padding: 8px 4px;
-  border-top: 1px solid var(--border);
-  min-height: 44px;
-}
-.ach-item:first-child { border-top: none; }
-
-.ach-item-text { flex: 1; min-width: 0; }
-.ach-item-name {
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9rem;
-}
-
-.rarity-badge {
-  font-size: 0.65em;
-  padding: 1px 6px;
-  border-radius: 4px;
-  color: white;
-  flex-shrink: 0;
-}
-.rarity-badge.rarity-bronze { background-color: #cd7f32; }
-.rarity-badge.rarity-silver { background-color: #8a96a3; }
-.rarity-badge.rarity-gold   { background-color: #d4a800; }
-.rarity-badge.rarity-legend { background-color: #9b59b6; }
-
-.ach-set-btn {
-  flex-shrink: 0;
-  width: 92px;
-  height: 36px;
-  margin-left: 10px;
-  font-family: var(--font);
-  font-size: 0.85rem;
-  font-weight: bold;
-  text-align: center;
-  color: white;
-  background-color: #007bff;
-  border: 1px solid #007bff;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.ach-set-btn.set { color: #007bff; background-color: white; }
+.ach-badge-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
