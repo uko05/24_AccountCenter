@@ -98,6 +98,27 @@
     <p id="avatar-msg" class="form-msg"></p>
   </section>
 
+  <section class="section" id="achievement-section">
+    <div class="section-title" data-i18n="achTitle">アチーブメント設定</div>
+    <p class="section-desc" data-i18n="achDesc">原神おみくじ・コネクトバトルで獲得した実績の中から1つ選んで、称号として設定できます。</p>
+
+    <p id="achievement-locked-notice" class="form-msg hidden">
+      <span data-i18n="achLockedText">この機能は「うーこポイント交換所」で「アチーブメント設定を解放」(50UP)と交換すると使えるようになります。</span>
+      <a href="https://uko05.github.io/08_UPoint/" target="_blank" rel="noopener" class="secondary-btn" style="display:inline-block; margin-top:8px; text-decoration:none;" data-i18n="achLockedLinkBtn">ポイント交換所を開く</a>
+    </p>
+
+    <div id="achievement-picker" class="ach-disabled">
+      <p class="ach-equipped-row">
+        <span data-i18n="achEquippedLabel">現在の称号：</span>
+        <span id="ach-equipped-display" class="ach-equipped-badge" data-i18n="achEquippedNone">未設定</span>
+        <button type="button" id="ach-clear-btn" class="secondary-btn" data-i18n="achClearBtn">解除する</button>
+      </p>
+      <div class="ach-list" id="ach-list"></div>
+      <p id="ach-msg" class="form-msg"></p>
+    </div>
+  </section>
+
+
   <section class="section" id="merge-section">
     <div class="section-title" data-i18n="mergeTitle">機種変した方はこちら</div>
     <p class="section-desc" data-i18n="mergeDesc">
@@ -143,6 +164,7 @@
 </footer>
 
 <script type="module" src="script.js"></script>
+<script type="module" src="achievementPicker.js"></script>
 <script type="module" src="account-status.js"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
