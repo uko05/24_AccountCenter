@@ -62,10 +62,13 @@ let equippedBadge = null;
 let myOmikujiAchIds = [];
 let myConnect10AchIds = [];
 let connect10Loaded = false;
+// 08_UPointはまだ一般公開していないので、管理者/デバッガー以外にはリンクを見せない。
+let hasPointExchangeAccess = false;
 
 function els() {
   return {
     lockedNotice: document.getElementById('achievement-locked-notice'),
+    lockedLink: document.getElementById('achievement-locked-link'),
     picker: document.getElementById('achievement-picker'),
     equippedDisplay: document.getElementById('ach-equipped-display'),
     clearBtn: document.getElementById('ach-clear-btn'),
@@ -103,11 +106,12 @@ function fitBadgeText(chip) {
 }
 
 function renderPicker() {
-  const { lockedNotice, picker, equippedDisplay, list } = els();
+  const { lockedNotice, lockedLink, picker, equippedDisplay, list } = els();
   if (!lockedNotice || !picker) return;
 
   lockedNotice.classList.toggle('hidden', unlocked);
   picker.classList.toggle('ach-disabled', !unlocked);
+  if (lockedLink) lockedLink.classList.toggle('hidden', !hasPointExchangeAccess);
 
   if (equippedDisplay) {
     equippedDisplay.textContent = badgeLabel(equippedBadge);
@@ -233,6 +237,12 @@ function initAchievementPicker() {
     myOmikujiAchIds = data.achievements || [];
     renderPicker();
   }, (e) => console.error('[achievementPicker] listen failed', e));
+
+  onSnapshot(doc(db, 'sharedUserRoles', sharedId), (snap) => {
+    const role = snap.exists() ? snap.data().role : null;
+    hasPointExchangeAccess = role === 'admin' || role === 'debugger';
+    renderPicker();
+  }, (e) => console.error('[achievementPicker] role listen failed', e));
 
   loadConnect10Achievements(sharedId);
   applyAchLang();
