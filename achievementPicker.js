@@ -87,6 +87,21 @@ function badgeLabel(badge) {
   return (currentLang() === 'en' && badge.nameEn) ? badge.nameEn : badge.name;
 }
 
+// バッジは幅固定(ach-badge)なので、名前が長くてはみ出す場合は
+// コネクトバトルのfitChipText(achievementManager.js)と同じやり方で、
+// 収まるまでフォントサイズを少しずつ縮めて全文が見えるようにする。
+function fitBadgeText(chip) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    chip.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(chip).fontSize);
+    const minSize = 8;
+    while (chip.scrollWidth > chip.clientWidth && size > minSize) {
+      size -= 0.5;
+      chip.style.fontSize = size + 'px';
+    }
+  }));
+}
+
 function renderPicker() {
   const { lockedNotice, picker, equippedDisplay, list } = els();
   if (!lockedNotice || !picker) return;
@@ -98,6 +113,7 @@ function renderPicker() {
     equippedDisplay.textContent = badgeLabel(equippedBadge);
     equippedDisplay.className = 'ach-badge ach-badge-current' + (equippedBadge ? ` rarity-${equippedBadge.rarity || 'bronze'}` : ' empty');
     equippedDisplay.title = equippedDisplay.textContent;
+    fitBadgeText(equippedDisplay);
   }
 
   if (!list) return;
@@ -139,6 +155,7 @@ function renderPicker() {
       badge.title = text;
       badge.addEventListener('click', () => (isEquipped ? clearBadge() : equip(site, ach)));
       grid.appendChild(badge);
+      fitBadgeText(badge);
     });
 
     list.appendChild(grid);
