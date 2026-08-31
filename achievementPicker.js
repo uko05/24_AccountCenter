@@ -27,6 +27,8 @@ const i18n = {
     achEquippedLabel: '現在の称号：',
     achEquippedNone: '未設定',
     achClearBtn: '解除する',
+    achSetBtn: '設定',
+    achSetDone: '設定済み',
     achEmpty: 'まだ実績を獲得していません。原神おみくじやコネクトバトルで実績を獲得すると、ここから選べるようになります。',
     achFromOmikuji: '原神おみくじ',
     achFromConnect10: 'コネクトバトル',
@@ -42,6 +44,8 @@ const i18n = {
     achEquippedLabel: 'Current title:',
     achEquippedNone: 'Not set',
     achClearBtn: 'Clear',
+    achSetBtn: 'Equip',
+    achSetDone: 'Equipped',
     achEmpty: "You haven't earned any achievements yet. Earn some on Genshin Omikuji or Connect Battle to pick from here.",
     achFromOmikuji: 'Genshin Omikuji',
     achFromConnect10: 'Connect Battle',
@@ -102,18 +106,14 @@ function renderPicker() {
   if (!list) return;
   list.innerHTML = '';
 
-  const entries = [
-    ...myOmikujiAchIds
-      .map((id) => OMIKUJI_ACHIEVEMENTS.find((a) => a.id === id))
-      .filter(Boolean)
-      .map((ach) => ({ site: 'omikuji', ach })),
-    ...myConnect10AchIds
-      .map((id) => CONNECT10_ACHIEVEMENTS.find((a) => a.id === id))
-      .filter(Boolean)
-      .map((ach) => ({ site: 'connect10', ach })),
-  ].sort((a, b) => (RARITY_ORDER[a.ach.rarity] ?? 9) - (RARITY_ORDER[b.ach.rarity] ?? 9));
+  const groups = [
+    { site: 'omikuji', labelKey: 'achFromOmikuji', total: OMIKUJI_ACHIEVEMENTS.length,
+      earned: myOmikujiAchIds.map((id) => OMIKUJI_ACHIEVEMENTS.find((a) => a.id === id)).filter(Boolean) },
+    { site: 'connect10', labelKey: 'achFromConnect10', total: CONNECT10_ACHIEVEMENTS.length,
+      earned: myConnect10AchIds.map((id) => CONNECT10_ACHIEVEMENTS.find((a) => a.id === id)).filter(Boolean) },
+  ];
 
-  if (!entries.length) {
+  if (!groups.some((g) => g.earned.length)) {
     const p = document.createElement('p');
     p.className = 'section-desc';
     p.textContent = t('achEmpty');
@@ -121,24 +121,51 @@ function renderPicker() {
     return;
   }
 
-  entries.forEach(({ site, ach }) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    const isEquipped = !!equippedBadge && equippedBadge.site === site && equippedBadge.achievementId === ach.id;
-    btn.className = `ach-pick-btn rarity-${ach.rarity || 'bronze'}${isEquipped ? ' active' : ''}`;
+  groups.filter((g) => g.earned.length).forEach(({ site, labelKey, total, earned }) => {
+    const achs = [...earned].sort((a, b) => (RARITY_ORDER[a.rarity] ?? 9) - (RARITY_ORDER[b.rarity] ?? 9));
 
-    const name = document.createElement('span');
-    name.className = 'ach-pick-name';
-    name.textContent = (currentLang() === 'en' && ach.nameEn) ? ach.nameEn : ach.name;
-    btn.appendChild(name);
+    const details = document.createElement('details');
+    details.className = 'ach-group';
+    details.open = true;
 
-    const source = document.createElement('span');
-    source.className = 'ach-pick-source';
-    source.textContent = site === 'omikuji' ? t('achFromOmikuji') : t('achFromConnect10');
-    btn.appendChild(source);
+    const summary = document.createElement('summary');
+    summary.className = 'ach-group-header';
+    summary.innerHTML = `<span class="ach-group-name">${t(labelKey)}</span><span class="ach-group-count">${earned.length} / ${total}</span>`;
+    details.appendChild(summary);
 
-    btn.addEventListener('click', () => equip(site, ach));
-    list.appendChild(btn);
+    const itemsEl = document.createElement('div');
+    itemsEl.className = 'ach-group-items';
+
+    achs.forEach((ach) => {
+      const isEquipped = !!equippedBadge && equippedBadge.site === site && equippedBadge.achievementId === ach.id;
+
+      const item = document.createElement('div');
+      item.className = 'ach-item';
+
+      const textEl = document.createElement('div');
+      textEl.className = 'ach-item-text';
+      const nameEl = document.createElement('span');
+      nameEl.className = 'ach-item-name';
+      nameEl.textContent = (currentLang() === 'en' && ach.nameEn) ? ach.nameEn : ach.name;
+      const rarityEl = document.createElement('span');
+      rarityEl.className = `rarity-badge rarity-${ach.rarity || 'bronze'}`;
+      rarityEl.textContent = ach.rarity || 'bronze';
+      nameEl.appendChild(rarityEl);
+      textEl.appendChild(nameEl);
+      item.appendChild(textEl);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `ach-set-btn${isEquipped ? ' set' : ''}`;
+      btn.textContent = isEquipped ? t('achSetDone') : t('achSetBtn');
+      btn.addEventListener('click', () => (isEquipped ? clearBadge() : equip(site, ach)));
+      item.appendChild(btn);
+
+      itemsEl.appendChild(item);
+    });
+
+    details.appendChild(itemsEl);
+    list.appendChild(details);
   });
 }
 

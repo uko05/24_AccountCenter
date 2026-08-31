@@ -81,6 +81,36 @@
     </div>
   </section>
 
+  <section class="section" id="merge-section">
+    <div class="section-title" data-i18n="mergeTitle">機種変した方はこちら</div>
+    <p class="section-desc" data-i18n="mergeDesc">
+      登録せずに占っていた方向けの引き継ぎ申請です。おみくじを引いた際に入力した「名前」「誕生日」を入力してください。
+      管理者が確認のうえ、この端末に今までのデータを引き継ぎます（すぐには反映されません）。
+    </p>
+    <div class="input-group">
+      <label for="merge-name" data-i18n="labelMergeName">おみくじ時に入力した名前</label>
+      <input type="text" id="merge-name" maxlength="20">
+    </div>
+    <div class="input-group">
+      <label for="merge-birthday" data-i18n="labelBirthday">誕生日</label>
+      <input type="date" id="merge-birthday">
+    </div>
+    <button id="merge-btn" class="primary-btn" data-i18n="mergeBtn">申請する</button>
+    <p id="merge-msg" class="form-msg"></p>
+
+    <p class="section-desc" style="margin-top:16px;" data-i18n="mergeContactDesc">
+      名前を入力せずに占っていた方・上記が当てはまらない方は、下のリンクから直接連絡してください。
+    </p>
+    <div class="contact-links">
+      <a href="https://x.com/uko_dayo_" target="_blank" rel="noopener">
+        <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/twitter_image.png" alt="Twitter">
+      </a>
+      <a href="https://t.co/0jAcAV2GJv" target="_blank" rel="noopener">
+        <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/discord_image.png" alt="Discord">
+      </a>
+    </div>
+  </section>
+
   <section class="section hidden" id="avatar-section">
     <div class="section-title" data-i18n="avatarTitle">アバターアイコン設定</div>
     <p class="section-desc" data-i18n="avatarDesc">原神・スタレのキャラクターを選んで、おみくじサイトなどで表示される丸型アイコンを設定できます。</p>
@@ -115,37 +145,6 @@
       </p>
       <div class="ach-list" id="ach-list"></div>
       <p id="ach-msg" class="form-msg"></p>
-    </div>
-  </section>
-
-
-  <section class="section" id="merge-section">
-    <div class="section-title" data-i18n="mergeTitle">機種変した方はこちら</div>
-    <p class="section-desc" data-i18n="mergeDesc">
-      登録せずに占っていた方向けの引き継ぎ申請です。おみくじを引いた際に入力した「名前」「誕生日」を入力してください。
-      管理者が確認のうえ、この端末に今までのデータを引き継ぎます（すぐには反映されません）。
-    </p>
-    <div class="input-group">
-      <label for="merge-name" data-i18n="labelMergeName">おみくじ時に入力した名前</label>
-      <input type="text" id="merge-name" maxlength="20">
-    </div>
-    <div class="input-group">
-      <label for="merge-birthday" data-i18n="labelBirthday">誕生日</label>
-      <input type="date" id="merge-birthday">
-    </div>
-    <button id="merge-btn" class="primary-btn" data-i18n="mergeBtn">申請する</button>
-    <p id="merge-msg" class="form-msg"></p>
-
-    <p class="section-desc" style="margin-top:16px;" data-i18n="mergeContactDesc">
-      名前を入力せずに占っていた方・上記が当てはまらない方は、下のリンクから直接連絡してください。
-    </p>
-    <div class="contact-links">
-      <a href="https://x.com/uko_dayo_" target="_blank" rel="noopener">
-        <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/twitter_image.png" alt="Twitter">
-      </a>
-      <a href="https://t.co/0jAcAV2GJv" target="_blank" rel="noopener">
-        <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/discord_image.png" alt="Discord">
-      </a>
     </div>
   </section>
 

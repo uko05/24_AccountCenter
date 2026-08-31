@@ -425,31 +425,84 @@ table.user-table th { background: var(--surface2); }
 .ach-equipped-badge.rarity-gold   { background: rgba(212,168,0,0.18);  border-color: rgba(212,168,0,0.5); }
 .ach-equipped-badge.rarity-legend { background: rgba(155,89,182,0.18); border-color: rgba(155,89,182,0.5); }
 
-.ach-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+/* 一覧部分はコネクトバトルのアチーブ一覧(playerInfo.html)と同じデザインに揃えている。
+   幅・高さは常に固定(ach-set-btnの92px幅、ach-itemの一定パディング)で、
+   テキスト量によって形がガタつかないようにする。 */
+.ach-list { display: flex; flex-direction: column; gap: 10px; }
 
-.ach-pick-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  background: var(--surface2);
+.ach-group {
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 12px;
-  cursor: pointer;
-  font-family: var(--font);
-  text-align: left;
+  border-radius: 6px;
+  background: var(--surface2);
 }
-.ach-pick-btn:hover { background: var(--border); }
-.ach-pick-btn.active { outline: 2px solid var(--accent); }
-.ach-pick-btn.rarity-bronze { background: rgba(205,127,50,0.12); }
-.ach-pick-btn.rarity-silver { background: rgba(168,184,200,0.18); }
-.ach-pick-btn.rarity-gold   { background: rgba(212,168,0,0.12); }
-.ach-pick-btn.rarity-legend { background: rgba(155,89,182,0.12); }
 
-.ach-pick-name { font-size: 0.9rem; font-weight: bold; }
-.ach-pick-source { font-size: 0.72rem; color: var(--muted); }
+.ach-group-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  font-weight: bold;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+.ach-group-header::-webkit-details-marker { display: none; }
+.ach-group-header::after {
+  content: '▶';
+  font-size: 0.7em;
+  color: var(--muted);
+  margin-left: 8px;
+  transition: transform 0.2s;
+}
+details[open] > .ach-group-header::after { transform: rotate(90deg); }
+
+.ach-group-name { flex: 1; }
+.ach-group-count { color: var(--muted); font-weight: normal; font-size: 0.85em; }
+
+.ach-group-items { padding: 0 12px 8px; }
+
+.ach-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 4px;
+  border-top: 1px solid var(--border);
+  min-height: 44px;
+}
+.ach-item:first-child { border-top: none; }
+
+.ach-item-text { flex: 1; min-width: 0; }
+.ach-item-name {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.rarity-badge {
+  font-size: 0.65em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: white;
+  flex-shrink: 0;
+}
+.rarity-badge.rarity-bronze { background-color: #cd7f32; }
+.rarity-badge.rarity-silver { background-color: #8a96a3; }
+.rarity-badge.rarity-gold   { background-color: #d4a800; }
+.rarity-badge.rarity-legend { background-color: #9b59b6; }
+
+.ach-set-btn {
+  flex-shrink: 0;
+  width: 92px;
+  height: 36px;
+  margin-left: 10px;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: bold;
+  text-align: center;
+  color: white;
+  background-color: #007bff;
+  border: 1px solid #007bff;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ach-set-btn.set { color: #007bff; background-color: white; }
