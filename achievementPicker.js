@@ -1,8 +1,9 @@
 // achievementPicker.js
 // アカウント管理画面の「アチーブメント設定」。
-// 08_UPointで「アチーブメント設定を解放」(50UP)と交換するまでは非活性。
-// 解放後は、原神おみくじ・コネクトバトル両方で獲得済みの実績から1つ選んで、
-// omikujiUsers/{userId}.equippedBadge として称号を設定できる。
+// 08_UPointで「アチーブメント設定を解放」(50UP)、または称号そのもの
+// (「うーこの部屋常連」「UP覇者」等)を購入するまでは非活性。
+// 解放後は、原神おみくじ・コネクトバトルで獲得済みの実績、または直接購入した
+// 称号の中から1つ選んで、omikujiUsers/{userId}.equippedBadge として設定できる。
 // 実際に他サイトの画面へ表示されるかどうかは別の話(例: 14_GenshinOmikujiは
 // 別途「アチーブメント表示を解放」(50UP)している人だけ表示する)。
 
@@ -18,33 +19,43 @@ function getSharedUserId() {
   return localStorage.getItem(LS_SHARED_UID) || '';
 }
 
+// 実績経由ではなく、08_UPointで直接購入できる称号。equippedBadge.siteには
+// 'uko05room' を入れて、他の2サイトの実績と同じ形式で選べるようにする。
+// perkFieldはsitePerks.accountCenter.{perkField}が立っているかどうかで所持判定する。
+const PURCHASED_TITLES = [
+  { id: 'title_regular', perkField: 'titleRegularUnlocked', rarity: 'gold', name: 'うーこの部屋常連', nameEn: 'Room Regular' },
+  { id: 'title_up_champion', perkField: 'titleUpChampionUnlocked', rarity: 'legend', name: 'UP覇者', nameEn: 'UP Champion' },
+];
+
 const i18n = {
   ja: {
     achTitle: 'アチーブメント設定',
-    achDesc: '原神おみくじ・コネクトバトルで獲得した実績の中から1つ選んで、称号として設定できます。',
-    achLockedText: 'この機能は「うーこポイント交換所」で「アチーブメント設定を解放」(50UP)と交換すると使えるようになります。',
+    achDesc: '原神おみくじ・コネクトバトルで獲得した実績や、うーこポイントで購入した称号の中から1つ選んで設定できます。',
+    achLockedText: 'この機能は「うーこポイント交換所」で「アチーブメント設定を解放」(50UP)、または称号そのものを購入すると使えるようになります。',
     achLockedLinkBtn: 'ポイント交換所を開く',
     achEquippedLabel: '現在の称号：',
     achEquippedNone: '未設定',
     achClearBtn: '解除する',
-    achEmpty: 'まだ実績を獲得していません。原神おみくじやコネクトバトルで実績を獲得すると、ここから選べるようになります。',
+    achEmpty: 'まだ選べる称号がありません。原神おみくじやコネクトバトルで実績を獲得するか、うーこポイント交換所で称号を購入すると、ここから選べるようになります。',
     achFromOmikuji: '原神おみくじ',
     achFromConnect10: 'コネクトバトル',
+    achFromPurchased: '購入した称号',
     achSetOk: '称号を設定しました。',
     achClearOk: '称号を解除しました。',
     achSaveFail: '保存に失敗しました。時間をおいて再度お試しください。',
   },
   en: {
     achTitle: 'Achievement Title',
-    achDesc: 'Pick one earned achievement from Genshin Omikuji or Connect Battle to display as your title.',
-    achLockedText: 'Unlock this by redeeming "Unlock Achievement Setting" (50UP) on the Uko Point Exchange.',
+    achDesc: 'Pick one earned achievement from Genshin Omikuji or Connect Battle, or a title purchased with Uko Points, to display as your title.',
+    achLockedText: 'Unlock this by redeeming "Unlock Achievement Setting" (50UP), or by purchasing a title outright, on the Uko Point Exchange.',
     achLockedLinkBtn: 'Open Point Exchange',
     achEquippedLabel: 'Current title:',
     achEquippedNone: 'Not set',
     achClearBtn: 'Clear',
-    achEmpty: "You haven't earned any achievements yet. Earn some on Genshin Omikuji or Connect Battle to pick from here.",
+    achEmpty: "No titles available yet. Earn achievements on Genshin Omikuji or Connect Battle, or purchase a title on the Uko Point Exchange, to pick from here.",
     achFromOmikuji: 'Genshin Omikuji',
     achFromConnect10: 'Connect Battle',
+    achFromPurchased: 'Purchased Titles',
     achSetOk: 'Title set.',
     achClearOk: 'Title cleared.',
     achSaveFail: 'Failed to save. Please try again later.',
@@ -61,6 +72,7 @@ let unlocked = false;
 let equippedBadge = null;
 let myOmikujiAchIds = [];
 let myConnect10AchIds = [];
+let myPurchasedTitleIds = [];
 let connect10Loaded = false;
 // 08_UPointはまだ一般公開していないので、管理者/デバッガー以外にはリンクを見せない。
 let hasPointExchangeAccess = false;
@@ -128,6 +140,8 @@ function renderPicker() {
       earned: myOmikujiAchIds.map((id) => OMIKUJI_ACHIEVEMENTS.find((a) => a.id === id)).filter(Boolean) },
     { site: 'connect10', labelKey: 'achFromConnect10', total: CONNECT10_ACHIEVEMENTS.length,
       earned: myConnect10AchIds.map((id) => CONNECT10_ACHIEVEMENTS.find((a) => a.id === id)).filter(Boolean) },
+    { site: 'uko05room', labelKey: 'achFromPurchased', total: PURCHASED_TITLES.length,
+      earned: myPurchasedTitleIds.map((id) => PURCHASED_TITLES.find((a) => a.id === id)).filter(Boolean) },
   ];
 
   if (!groups.some((g) => g.earned.length)) {
@@ -232,7 +246,11 @@ function initAchievementPicker() {
 
   onSnapshot(doc(db, 'omikujiUsers', sharedId), (snap) => {
     const data = snap.exists() ? snap.data() : {};
-    unlocked = !!data.sitePerks?.accountCenter?.achievementSettingUnlocked;
+    const perks = data.sitePerks?.accountCenter || {};
+    // 「アチーブメント設定を解放」を買った場合に加えて、称号を1つでも直接
+    // 購入していれば、それも設定できるよう同様に解放扱いにする。
+    myPurchasedTitleIds = PURCHASED_TITLES.filter((pt) => perks[pt.perkField]).map((pt) => pt.id);
+    unlocked = !!perks.achievementSettingUnlocked || myPurchasedTitleIds.length > 0;
     equippedBadge = data.equippedBadge || null;
     myOmikujiAchIds = data.achievements || [];
     renderPicker();
