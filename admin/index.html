@@ -96,65 +96,97 @@
 
   <section class="section hidden" id="edit-section">
     <div class="section-title">ユーザー編集</div>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
       <div class="uid-box" id="edit-uid"></div>
-      <button id="unregister-btn" class="danger-btn hidden" style="width:auto; padding:7px 16px;">登録解除</button>
+      <div class="btn-row" style="margin:0;">
+        <button id="save-edit-btn" class="primary-btn" style="width:auto; padding:9px 24px;">保存</button>
+        <button id="unregister-btn" class="danger-btn hidden" style="width:auto; padding:7px 16px;">登録解除</button>
+        <button id="cancel-edit-btn" class="secondary-btn">閉じる</button>
+      </div>
     </div>
 
-    <div class="input-group"><label>名前</label><input type="text" id="edit-name"></div>
-    <div class="input-group"><label>誕生日</label><input type="date" id="edit-birthday"></div>
-    <div class="input-group">
-      <label>性別</label>
-      <div class="radio-row">
-        <label><input type="radio" name="edit-gender" value=""> 任意（未設定）</label>
-        <label><input type="radio" name="edit-gender" value="male"> 男性</label>
-        <label><input type="radio" name="edit-gender" value="female"> 女性</label>
-      </div>
+    <div class="admin-tab-bar">
+      <button type="button" class="admin-tab-btn active" data-tab="basic">基本情報</button>
+      <button type="button" class="admin-tab-btn" data-tab="omikuji">原神おみくじ</button>
+      <button type="button" class="admin-tab-btn" data-tab="connect10">コネクトバトル</button>
     </div>
-    <div class="input-group">
-      <label>言語</label>
-      <div class="radio-row">
-        <label><input type="radio" name="edit-lang" value="ja"> 日本語</label>
-        <label><input type="radio" name="edit-lang" value="en"> English</label>
+
+    <div class="admin-tab-panel" data-tab-panel="basic">
+      <div class="input-group"><label>誕生日</label><input type="date" id="edit-birthday"></div>
+      <div class="input-group">
+        <label>性別</label>
+        <div class="radio-row">
+          <label><input type="radio" name="edit-gender" value=""> 任意（未設定）</label>
+          <label><input type="radio" name="edit-gender" value="male"> 男性</label>
+          <label><input type="radio" name="edit-gender" value="female"> 女性</label>
+        </div>
       </div>
-    </div>
-    <div class="input-group">
-      <label>ロール（うこ氏サイト群共通）</label>
-      <div class="radio-row">
-        <label><input type="radio" name="edit-role" value="general"> 一般</label>
-        <label><input type="radio" name="edit-role" value="debugger"> デバッガー</label>
-        <label><input type="radio" name="edit-role" value="admin"> 管理者</label>
+      <div class="input-group">
+        <label>言語</label>
+        <div class="radio-row">
+          <label><input type="radio" name="edit-lang" value="ja"> 日本語</label>
+          <label><input type="radio" name="edit-lang" value="en"> English</label>
+        </div>
       </div>
-      <div id="edit-role-debug-options" class="hidden" style="margin-top:8px; padding-left:4px;">
-        <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
-          <input type="checkbox" id="edit-debug-connect"> コネクトバトル（実績の強制解放・リセットが可能）
+      <div class="input-group">
+        <label>ロール（うこ氏サイト群共通）</label>
+        <div class="radio-row">
+          <label><input type="radio" name="edit-role" value="general"> 一般</label>
+          <label><input type="radio" name="edit-role" value="debugger"> デバッガー</label>
+          <label><input type="radio" name="edit-role" value="admin"> 管理者</label>
+        </div>
+        <div id="edit-role-debug-options" class="hidden" style="margin-top:8px; padding-left:4px;">
+          <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+            <input type="checkbox" id="edit-debug-connect"> コネクトバトル（実績の強制解放・リセットが可能）
+          </label>
+          <label style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="edit-debug-omikuji"> 原神おみくじ（1日の上限を無視して何度でも占える。統計は汚さない）
+          </label>
+        </div>
+      </div>
+      <div class="input-group"><label>UP残高 (ukoPoints)</label><input type="number" id="edit-uko-points"></div>
+      <div class="input-group"><label>チャット送信可能数のボーナス (sitePerks.friendBoard.permanentExtraChat)</label><input type="number" id="edit-perk-chat-bonus"></div>
+      <div class="input-group">
+        <label>特典解放状況 (sitePerks)</label>
+        <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px;"><input type="checkbox" id="perk-ach-setting"> アチーブメント設定を解放</label>
+        <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px;"><input type="checkbox" id="perk-ach-display"> アチーブメント表示を解放（おみくじ）</label>
+        <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px;"><input type="checkbox" id="perk-title-regular"> 称号「うーこの部屋常連」購入済み</label>
+        <label style="display:flex; align-items:center; gap:6px; margin-bottom:6px;"><input type="checkbox" id="perk-title-up-champion"> 称号「UP覇者」購入済み</label>
+        <label style="display:flex; align-items:center; gap:6px;"><input type="checkbox" id="perk-title-fate-observer"> 称号「運命の観測者」購入済み</label>
+      </div>
+      <div class="input-group">
+        <label>現在の称号 (equippedBadge)</label>
+        <div class="uid-box" id="edit-equipped-badge-display">未設定</div>
+        <label style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+          <input type="checkbox" id="edit-clear-badge"> 保存時にこの称号を解除する
         </label>
-        <label style="display:flex; align-items:center; gap:6px;">
-          <input type="checkbox" id="edit-debug-omikuji"> 原神おみくじ（1日の上限を無視して何度でも占える。統計は汚さない）
-        </label>
       </div>
     </div>
-    <div class="input-group"><label>累計おみくじ回数 (achStats.totalCount)</label><input type="number" id="edit-total-count"></div>
-    <div class="input-group"><label>最大連続日数 (achStats.maxStreak)</label><input type="number" id="edit-max-streak"></div>
-    <div class="input-group"><label>もらったいいね数 (totalLikesReceived)</label><input type="number" id="edit-likes-received"></div>
-    <div class="input-group"><label>あげたいいね数 (totalLikesGiven)</label><input type="number" id="edit-likes-given"></div>
-    <div class="input-group">
-      <label>コレクション（アルカナID、1行に1つ。例: fool_upright）</label>
-      <textarea id="edit-collection"></textarea>
+
+    <div class="admin-tab-panel hidden" data-tab-panel="omikuji">
+      <div class="input-group"><label>名前 (name)</label><input type="text" id="edit-name"></div>
+      <div class="input-group"><label>累計おみくじ回数 (achStats.totalCount)</label><input type="number" id="edit-total-count"></div>
+      <div class="input-group"><label>最大連続日数 (achStats.maxStreak)</label><input type="number" id="edit-max-streak"></div>
+      <div class="input-group"><label>もらったいいね数 (totalLikesReceived)</label><input type="number" id="edit-likes-received"></div>
+      <div class="input-group"><label>あげたいいね数 (totalLikesGiven)</label><input type="number" id="edit-likes-given"></div>
+      <div class="input-group">
+        <label>コレクション（アルカナID、1行に1つ。例: fool_upright）</label>
+        <textarea id="edit-collection"></textarea>
+      </div>
+      <div id="edit-achievements"></div>
     </div>
 
-    <div id="edit-achievements"></div>
-
-    <div class="btn-row">
-      <button id="save-edit-btn" class="primary-btn" style="width:auto; padding:9px 24px;">保存</button>
-      <button id="cancel-edit-btn" class="secondary-btn">閉じる</button>
+    <div class="admin-tab-panel hidden" data-tab-panel="connect10">
+      <p id="connect10-not-found-msg" class="section-desc hidden">このユーザーのコネクトバトルデータは見つかりませんでした（未プレイの可能性があります）。</p>
+      <div id="edit-connect10-achievements"></div>
     </div>
+
     <p id="edit-msg" class="form-msg"></p>
   </section>
 
 </main>
 
-<script type="module" src="admin.js?v=6"></script>
+<script type="module" src="admin.js?v=7"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

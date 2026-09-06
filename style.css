@@ -303,6 +303,29 @@ table.user-table th { background: var(--surface2); }
 .status-done     { background: #d4edda; color: var(--ok); }
 .status-rejected { background: #fdecea; color: var(--danger); }
 
+/* ===== 管理画面: ユーザー編集のタブ ===== */
+.admin-tab-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.admin-tab-btn {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+.admin-tab-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: bold;
+}
+
 .hidden { display: none !important; }
 
 /* ===== アバターアイコン設定 ===== */

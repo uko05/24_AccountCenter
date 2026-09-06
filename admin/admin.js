@@ -4,12 +4,13 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, deleteDoc, collection, query, where, orderBy, limit, getDocs, serverTimestamp,
+  doc, getDoc, setDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const ACCOUNTS_LOAD_LIMIT = 100;
 const ACCOUNTS_FETCH_LIMIT = 300;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
+import { ACHIEVEMENT_GROUPS as CONNECT10_ACHIEVEMENT_GROUPS } from "https://uko05.github.io/10_connect/public/scripts/achievements.js";
 
 const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
 
@@ -422,11 +423,27 @@ const editSection   = document.getElementById('edit-section');
 let currentEditUid     = null;
 let currentEditData    = null;
 let currentEditAccount = null;
+let currentConnect10DocId = null;
+
+// ===== 編集フォームのタブ切り替え =====
+function switchEditTab(tabKey) {
+  document.querySelectorAll('.admin-tab-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.tab === tabKey);
+  });
+  document.querySelectorAll('.admin-tab-panel').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.tabPanel !== tabKey);
+  });
+}
+document.querySelectorAll('.admin-tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => switchEditTab(btn.dataset.tab));
+});
 
 async function openEditor(uid, data, account = null) {
   currentEditUid = uid;
   currentEditData = data;
   currentEditAccount = account;
+  currentConnect10DocId = null;
+  switchEditTab('basic');
 
   document.getElementById('unregister-btn').classList.toggle('hidden', !account?.isRegistered);
 
@@ -441,7 +458,33 @@ async function openEditor(uid, data, account = null) {
   document.getElementById('edit-likes-given').value = data.totalLikesGiven ?? 0;
   document.getElementById('edit-collection').value = (data.collection || []).join('\n');
 
-  renderAchievementCheckboxes(new Set(data.achievements || []));
+  document.getElementById('edit-uko-points').value = data.ukoPoints ?? 0;
+  const perks = data.sitePerks || {};
+  document.getElementById('edit-perk-chat-bonus').value = perks.friendBoard?.permanentExtraChat ?? 0;
+  document.getElementById('perk-ach-setting').checked = !!perks.accountCenter?.achievementSettingUnlocked;
+  document.getElementById('perk-title-regular').checked = !!perks.accountCenter?.titleRegularUnlocked;
+  document.getElementById('perk-title-up-champion').checked = !!perks.accountCenter?.titleUpChampionUnlocked;
+  document.getElementById('perk-ach-display').checked = !!perks.omikuji?.achievementDisplayUnlocked;
+  document.getElementById('perk-title-fate-observer').checked = !!perks.omikuji?.titleFateObserverUnlocked;
+
+  const badge = data.equippedBadge;
+  document.getElementById('edit-equipped-badge-display').textContent = badge
+    ? `${badge.name}（${badge.rarity || 'bronze'} / ${badge.site}）`
+    : '未設定';
+  document.getElementById('edit-clear-badge').checked = false;
+
+  renderAchievementCheckboxesInto('edit-achievements', ACHIEVEMENT_GROUPS, new Set(data.achievements || []));
+
+  const notFoundMsg = document.getElementById('connect10-not-found-msg');
+  const connect10Snap = await getDocs(query(collection(db, 'connectUsers'), where('sharedUserId', '==', uid)));
+  if (!connect10Snap.empty) {
+    currentConnect10DocId = connect10Snap.docs[0].id;
+    notFoundMsg.classList.add('hidden');
+    renderAchievementCheckboxesInto('edit-connect10-achievements', CONNECT10_ACHIEVEMENT_GROUPS, new Set(connect10Snap.docs[0].data().achievements || []));
+  } else {
+    notFoundMsg.classList.remove('hidden');
+    document.getElementById('edit-connect10-achievements').innerHTML = '';
+  }
 
   const roleSnap = await getDoc(doc(db, 'sharedUserRoles', uid));
   const roleData = roleSnap.exists() ? roleSnap.data() : {};
@@ -463,10 +506,12 @@ document.querySelectorAll('input[name="edit-role"]').forEach((r) => {
   r.addEventListener('change', updateRoleDebugOptionsVisibility);
 });
 
-function renderAchievementCheckboxes(achievedSet) {
-  const container = document.getElementById('edit-achievements');
+// 原神おみくじ・コネクトバトルどちらの実績一覧も同じ形(groups[].items[].{id,name,condition})
+// なので、対象のコンテナと実績グループを渡すだけで両方に使い回せるようにしている。
+function renderAchievementCheckboxesInto(containerId, groups, achievedSet) {
+  const container = document.getElementById(containerId);
   container.innerHTML = '';
-  ACHIEVEMENT_GROUPS.forEach((group) => {
+  groups.forEach((group) => {
     const groupEl = document.createElement('div');
     groupEl.className = 'ach-group';
     const rows = group.items.map((item) => `
@@ -485,6 +530,7 @@ document.getElementById('cancel-edit-btn').addEventListener('click', () => {
   currentEditUid = null;
   currentEditData = null;
   currentEditAccount = null;
+  currentConnect10DocId = null;
 });
 
 document.getElementById('unregister-btn').addEventListener('click', async () => {
@@ -494,6 +540,7 @@ document.getElementById('unregister-btn').addEventListener('click', async () => 
   currentEditUid = null;
   currentEditData = null;
   currentEditAccount = null;
+  currentConnect10DocId = null;
 });
 
 document.getElementById('save-edit-btn').addEventListener('click', async () => {
@@ -521,12 +568,30 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     },
     totalLikesReceived: Number(document.getElementById('edit-likes-received').value) || 0,
     totalLikesGiven: Number(document.getElementById('edit-likes-given').value) || 0,
+    ukoPoints: Number(document.getElementById('edit-uko-points').value) || 0,
+    // sitePerksは他にも今後増えていくフィールドなので、ここに無いキーを
+    // うっかり消さないようドット区切りのフィールドパスで1つずつ更新する
+    // (nested objectをまるごと渡すとsitePerks全体を上書きしてしまうため)。
+    'sitePerks.friendBoard.permanentExtraChat': Number(document.getElementById('edit-perk-chat-bonus').value) || 0,
+    'sitePerks.accountCenter.achievementSettingUnlocked': document.getElementById('perk-ach-setting').checked,
+    'sitePerks.accountCenter.titleRegularUnlocked': document.getElementById('perk-title-regular').checked,
+    'sitePerks.accountCenter.titleUpChampionUnlocked': document.getElementById('perk-title-up-champion').checked,
+    'sitePerks.omikuji.achievementDisplayUnlocked': document.getElementById('perk-ach-display').checked,
+    'sitePerks.omikuji.titleFateObserverUnlocked': document.getElementById('perk-title-fate-observer').checked,
     updatedAt: serverTimestamp(),
   };
+
+  if (document.getElementById('edit-clear-badge').checked) {
+    payload.equippedBadge = deleteField();
+  }
 
   const role = getRadioValue('edit-role') || 'general';
   const debugConnect = document.getElementById('edit-debug-connect').checked;
   const debugOmikuji = document.getElementById('edit-debug-omikuji').checked;
+
+  const connect10Achievements = Array.from(
+    document.querySelectorAll('#edit-connect10-achievements input[type="checkbox"]:checked'),
+  ).map((el) => el.value);
 
   try {
     await setDoc(doc(db, 'omikujiUsers', currentEditUid), payload, { merge: true });
@@ -538,6 +603,9 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     });
     if (role === 'debugger' && debugConnect) {
       await grantConnectDebugAchievement(currentEditUid);
+    }
+    if (currentConnect10DocId) {
+      await setDoc(doc(db, 'connectUsers', currentConnect10DocId), { achievements: connect10Achievements }, { merge: true });
     }
     msgEl.textContent = '保存しました。';
     msgEl.classList.remove('error');
