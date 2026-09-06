@@ -25,6 +25,7 @@ function getSharedUserId() {
 const PURCHASED_TITLES = [
   { id: 'title_regular', perkField: 'titleRegularUnlocked', rarity: 'gold', name: 'うーこの部屋常連', nameEn: 'Room Regular' },
   { id: 'title_up_champion', perkField: 'titleUpChampionUnlocked', rarity: 'legend', name: 'UP覇者', nameEn: 'UP Champion' },
+  { id: 'title_fate_observer', perkField: 'titleFateObserverUnlocked', rarity: 'legend', name: '運命の観測者', nameEn: 'Fate Observer' },
 ];
 
 const i18n = {
