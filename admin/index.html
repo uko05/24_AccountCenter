@@ -109,6 +109,7 @@
       <button type="button" class="admin-tab-btn active" data-tab="basic">基本情報</button>
       <button type="button" class="admin-tab-btn" data-tab="omikuji">原神おみくじ</button>
       <button type="button" class="admin-tab-btn" data-tab="connect10">コネクトバトル</button>
+      <button type="button" class="admin-tab-btn" data-tab="images">画像メーカー</button>
     </div>
 
     <div class="admin-tab-panel" data-tab-panel="basic">
@@ -181,12 +182,17 @@
       <div id="edit-connect10-achievements"></div>
     </div>
 
+    <div class="admin-tab-panel hidden" data-tab-panel="images">
+      <p id="saved-images-empty-msg" class="section-desc hidden">保存された画像はまだありません。</p>
+      <div id="edit-saved-images" style="display:flex; flex-wrap:wrap; gap:16px;"></div>
+    </div>
+
     <p id="edit-msg" class="form-msg"></p>
   </section>
 
 </main>
 
-<script type="module" src="admin.js?v=7"></script>
+<script type="module" src="admin.js?v=8"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

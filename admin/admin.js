@@ -11,8 +11,20 @@ const ACCOUNTS_LOAD_LIMIT = 100;
 const ACCOUNTS_FETCH_LIMIT = 300;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 import { ACHIEVEMENT_GROUPS as CONNECT10_ACHIEVEMENT_GROUPS } from "https://uko05.github.io/10_connect/public/scripts/achievements.js";
+import { formatSavedAt } from '../saved-image.js';
 
 const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
+
+// saved-image.js を使って画像を保存している「画像メーカー系」サイト一覧。
+// savedProfileImages/{sharedUserId} は { [siteId]: {url, updatedAt} } という
+// 1ドキュメントにまとまっているので、ここでは一覧表示するだけでよい。
+const SAVED_IMAGE_SITES = [
+  { id: 'genshinRanking', label: '推しキャラランキング【原神】' },
+  { id: 'starrailRankingPath', label: '推しキャラランキング【スタレ・運命】' },
+  { id: 'starrailRankingElement', label: '推しキャラランキング【スタレ・属性】' },
+  { id: 'genshinCheck', label: '#原神チェックシート' },
+  { id: 'starrailCheck', label: '#スタレチェックシート' },
+];
 
 function countByRarity(achievementIds) {
   const counts = { bronze: 0, silver: 0, gold: 0, legend: 0 };
@@ -486,6 +498,9 @@ async function openEditor(uid, data, account = null) {
     document.getElementById('edit-connect10-achievements').innerHTML = '';
   }
 
+  const savedImagesSnap = await getDoc(doc(db, 'savedProfileImages', uid));
+  renderSavedImages(savedImagesSnap.exists() ? savedImagesSnap.data() : {});
+
   const roleSnap = await getDoc(doc(db, 'sharedUserRoles', uid));
   const roleData = roleSnap.exists() ? roleSnap.data() : {};
   setRadioValue('edit-role', roleData.role || 'general');
@@ -522,6 +537,32 @@ function renderAchievementCheckboxesInto(containerId, groups, achievedSet) {
     `).join('');
     groupEl.innerHTML = `<h5>${escapeHtml(group.name)}</h5>${rows}`;
     container.appendChild(groupEl);
+  });
+}
+
+// savedProfileImages/{uid} は { [siteId]: {url, updatedAt} } という1ドキュメントに
+// 全サイト分まとまっているので、SAVED_IMAGE_SITES一覧に沿って並べるだけでよい
+// (削除機能は無し。閲覧専用)。
+function renderSavedImages(savedImagesData) {
+  const container = document.getElementById('edit-saved-images');
+  const emptyMsg = document.getElementById('saved-images-empty-msg');
+  container.innerHTML = '';
+
+  const entries = SAVED_IMAGE_SITES
+    .map((site) => ({ site, entry: savedImagesData[site.id] }))
+    .filter(({ entry }) => entry && entry.url);
+
+  emptyMsg.classList.toggle('hidden', entries.length > 0);
+
+  entries.forEach(({ site, entry }) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'width:160px;';
+    card.innerHTML = `
+      <img src="${escapeHtml(entry.url)}" alt="${escapeHtml(site.label)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
+      <p style="font-size:0.78rem; font-weight:bold; margin-top:6px;">${escapeHtml(site.label)}</p>
+      <p style="font-size:0.72rem; color:var(--muted);">${escapeHtml(formatSavedAt(entry.updatedAt))}</p>
+    `;
+    container.appendChild(card);
   });
 }
 
