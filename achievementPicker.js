@@ -21,11 +21,12 @@ function getSharedUserId() {
 
 // 実績経由ではなく、08_UPointで直接購入できる称号。equippedBadge.siteには
 // 'uko05room' を入れて、他の2サイトの実績と同じ形式で選べるようにする。
-// perkFieldはsitePerks.accountCenter.{perkField}が立っているかどうかで所持判定する。
+// perkSiteKey: 08_UPointでどのサイト枠(グループ)の交換として売られているか。
+// sitePerks.{perkSiteKey}.{perkField} の値が立っているかどうかで購入済み判定する。
 const PURCHASED_TITLES = [
-  { id: 'title_regular', perkField: 'titleRegularUnlocked', rarity: 'gold', name: 'うーこの部屋常連', nameEn: 'Room Regular' },
-  { id: 'title_up_champion', perkField: 'titleUpChampionUnlocked', rarity: 'legend', name: 'UP覇者', nameEn: 'UP Champion' },
-  { id: 'title_fate_observer', perkField: 'titleFateObserverUnlocked', rarity: 'legend', name: '運命の観測者', nameEn: 'Fate Observer' },
+  { id: 'title_regular', perkSiteKey: 'accountCenter', perkField: 'titleRegularUnlocked', rarity: 'gold', name: 'うーこの部屋常連', nameEn: 'Room Regular' },
+  { id: 'title_up_champion', perkSiteKey: 'accountCenter', perkField: 'titleUpChampionUnlocked', rarity: 'legend', name: 'UP覇者', nameEn: 'UP Champion' },
+  { id: 'title_fate_observer', perkSiteKey: 'omikuji', perkField: 'titleFateObserverUnlocked', rarity: 'legend', name: '運命の観測者', nameEn: 'Fate Observer' },
 ];
 
 const i18n = {
@@ -247,11 +248,13 @@ function initAchievementPicker() {
 
   onSnapshot(doc(db, 'omikujiUsers', sharedId), (snap) => {
     const data = snap.exists() ? snap.data() : {};
-    const perks = data.sitePerks?.accountCenter || {};
+    const allSitePerks = data.sitePerks || {};
     // 「アチーブメント設定を解放」を買った場合に加えて、称号を1つでも直接
     // 購入していれば、それも設定できるよう同様に解放扱いにする。
-    myPurchasedTitleIds = PURCHASED_TITLES.filter((pt) => perks[pt.perkField]).map((pt) => pt.id);
-    unlocked = !!perks.achievementSettingUnlocked || myPurchasedTitleIds.length > 0;
+    myPurchasedTitleIds = PURCHASED_TITLES
+      .filter((pt) => allSitePerks[pt.perkSiteKey]?.[pt.perkField])
+      .map((pt) => pt.id);
+    unlocked = !!allSitePerks.accountCenter?.achievementSettingUnlocked || myPurchasedTitleIds.length > 0;
     equippedBadge = data.equippedBadge || null;
     myOmikujiAchIds = data.achievements || [];
     renderPicker();
