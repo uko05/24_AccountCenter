@@ -77,6 +77,10 @@
       <label for="accounts-filter">絞り込み（登録ID・名前）</label>
       <input type="text" id="accounts-filter" placeholder="入力するとリアルタイムで絞り込みます">
     </div>
+    <details style="margin-bottom:10px;">
+      <summary style="cursor:pointer; font-size:0.85rem; color:#555;">表示する列を選ぶ</summary>
+      <div id="accounts-column-toggles" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:8px;"></div>
+    </details>
     <div id="accounts-count" class="section-desc" style="margin:0 0 6px;"></div>
     <div style="overflow-x:auto;">
       <div id="accounts-list"></div>
@@ -192,7 +196,7 @@
 
 </main>
 
-<script type="module" src="admin.js?v=9"></script>
+<script type="module" src="admin.js?v=10"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

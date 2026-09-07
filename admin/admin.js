@@ -225,19 +225,64 @@ let accountsSortDir = 1; // 1=昇順, -1=降順
 
 const ROLE_LABELS = { general: '一般', debugger: 'デバッガー', admin: '管理者' };
 
+// 列ごとに「ソート用の値(get)」と「セルの表示HTML(render)」を持たせる。
+// renderを省略した列はgetの値をそのままエスケープして表示する。
 const ACCOUNTS_SORT_COLUMNS = {
-  name:      { label: '名前',         width: '20%',  get: (r) => r.u.name || '' },
-  loginId:   { label: '登録ID',       width: '18%',  get: (r) => r.a.loginId || '' },
-  role:      { label: 'ロール',       width: '1%',   get: (r) => r.a.role || 'general' },
-  birthday:  { label: '誕生日',       width: '20%',  get: (r) => r.u.birthday || '' },
-  updatedAt: { label: '最終更新日時', width: '1%',   get: (r) => r.u.updatedAt?.toMillis?.() ?? 0 },
+  name:      { label: '名前',         width: '20%',  get: (r) => r.u.name || '', render: (r) => escapeHtml(r.u.name || '(無記名)') },
+  loginId:   { label: '登録ID',       width: '18%',  get: (r) => r.a.loginId || '', render: (r) => escapeHtml(r.a.loginId || '-') },
+  role:      { label: 'ロール',       width: '1%',   get: (r) => r.a.role || 'general', render: (r) => escapeHtml(ROLE_LABELS[r.a.role] || r.a.role) },
+  birthday:  { label: '誕生日',       width: '20%',  get: (r) => r.u.birthday || '', render: (r) => escapeHtml(r.u.birthday || '-') },
+  updatedAt: { label: '最終更新日時', width: '1%',   get: (r) => r.u.updatedAt?.toMillis?.() ?? 0, render: (r) => fmtTimestamp(r.u.updatedAt) },
   bronze:    { label: '銅',           width: '1%',   get: (r) => r.counts.bronze },
   silver:    { label: '銀',           width: '1%',   get: (r) => r.counts.silver },
   gold:      { label: '金',           width: '1%',   get: (r) => r.counts.gold },
   legend:    { label: '虹',           width: '1%',   get: (r) => r.counts.legend },
   given:     { label: 'アゲ',         width: '1%',   get: (r) => r.u.totalLikesGiven ?? 0 },
   received:  { label: 'モラ',         width: '1%',   get: (r) => r.u.totalLikesReceived ?? 0 },
+  savedImages: {
+    label: '画像保存', width: '1%',
+    get: (r) => (r.hasSavedImages ? 1 : 0),
+    render: (r) => (r.hasSavedImages ? '✅' : ''),
+  },
 };
+
+// 表示する列の選択状態(この管理画面を開いているブラウザだけのローカル設定)。
+// 列が増えて表が窮屈になってきたため、使わない列を個別に隠せるようにしてある。
+const ACCOUNTS_VISIBLE_COLS_KEY = 'adminAccountsVisibleColumns';
+function loadVisibleColumns() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACCOUNTS_VISIBLE_COLS_KEY) || '{}');
+    const result = {};
+    Object.keys(ACCOUNTS_SORT_COLUMNS).forEach((key) => { result[key] = saved[key] !== false; });
+    return result;
+  } catch (e) {
+    const result = {};
+    Object.keys(ACCOUNTS_SORT_COLUMNS).forEach((key) => { result[key] = true; });
+    return result;
+  }
+}
+function saveVisibleColumns(cols) {
+  try { localStorage.setItem(ACCOUNTS_VISIBLE_COLS_KEY, JSON.stringify(cols)); } catch (e) {}
+}
+let accountsVisibleColumns = loadVisibleColumns();
+
+const columnTogglesEl = document.getElementById('accounts-column-toggles');
+function renderColumnToggles() {
+  columnTogglesEl.innerHTML = Object.entries(ACCOUNTS_SORT_COLUMNS).map(([key, col]) => `
+    <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;">
+      <input type="checkbox" data-col-key="${key}" ${accountsVisibleColumns[key] ? 'checked' : ''}>
+      ${escapeHtml(col.label)}
+    </label>
+  `).join('');
+  columnTogglesEl.querySelectorAll('input[data-col-key]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      accountsVisibleColumns[cb.dataset.colKey] = cb.checked;
+      saveVisibleColumns(accountsVisibleColumns);
+      renderAccounts(accountsFilterEl.value);
+    });
+  });
+}
+renderColumnToggles();
 
 document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
 accountsFilterEl.addEventListener('input', () => renderAccounts(accountsFilterEl.value));
@@ -249,10 +294,11 @@ async function loadAccounts() {
 
   // 1度もおみくじを引いたことがない(achStats.totalCountが0)人を除外した上で100件にしたいので、
   // 多めに取得してからフィルタ・切り詰める(除外分を考慮した複合インデックス作成を避けるため)。
-  const [usersSnap, linkSnap, roleSnap] = await Promise.all([
+  const [usersSnap, linkSnap, roleSnap, savedImagesSnap] = await Promise.all([
     getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'), limit(ACCOUNTS_FETCH_LIMIT))),
     getDocs(collection(db, 'accountLinks')),
     getDocs(collection(db, 'sharedUserRoles')),
+    getDocs(collection(db, 'savedProfileImages')),
   ]);
 
   const linkByOmikujiId = new Map();
@@ -263,6 +309,14 @@ async function loadAccounts() {
 
   const roleByOmikujiId = new Map();
   roleSnap.docs.forEach((roleDoc) => roleByOmikujiId.set(roleDoc.id, roleDoc.data().role || 'general'));
+
+  // savedProfileImages/{omikujiUserId}は{ [siteId]: {url, updatedAt} }なので、
+  // 一覧では「1つでも画像メーカー系サイトに保存しているか」だけ列で見せる
+  // (サイトごとの内訳は個別編集画面の「画像メーカー」タブで見られるため)。
+  const hasSavedImagesSet = new Set();
+  savedImagesSnap.docs.forEach((d) => {
+    if (Object.keys(d.data() || {}).length > 0) hasSavedImagesSet.add(d.id);
+  });
 
   allAccounts = usersSnap.docs
     .filter((userDoc) => (userDoc.data().achStats?.totalCount || 0) > 0)
@@ -276,6 +330,7 @@ async function loadAccounts() {
         isRegistered: !!link,
         role: roleByOmikujiId.get(userDoc.id) || 'general',
         omikujiData: userDoc.data(),
+        hasSavedImages: hasSavedImagesSet.has(userDoc.id),
       };
     });
 
@@ -301,7 +356,9 @@ function renderAccounts(filterText) {
     return;
   }
 
-  let rows = filtered.map((a) => ({ a, u: a.omikujiData, counts: countByRarity(a.omikujiData.achievements) }));
+  let rows = filtered.map((a) => ({
+    a, u: a.omikujiData, counts: countByRarity(a.omikujiData.achievements), hasSavedImages: a.hasSavedImages,
+  }));
 
   if (accountsSortKey) {
     const getter = ACCOUNTS_SORT_COLUMNS[accountsSortKey].get;
@@ -314,7 +371,8 @@ function renderAccounts(filterText) {
   }
 
   const sortArrow = (key) => (accountsSortKey === key ? (accountsSortDir === 1 ? ' ▲' : ' ▼') : '');
-  const headerCells = Object.entries(ACCOUNTS_SORT_COLUMNS).map(([key, col]) => `
+  const visibleColumnEntries = Object.entries(ACCOUNTS_SORT_COLUMNS).filter(([key]) => accountsVisibleColumns[key]);
+  const headerCells = visibleColumnEntries.map(([key, col]) => `
     <th data-sort-key="${key}" style="width:${col.width}; white-space:nowrap; cursor:pointer; user-select:none;">${col.label}${sortArrow(key)}</th>
   `).join('');
 
@@ -331,28 +389,19 @@ function renderAccounts(filterText) {
   `;
   const tbody = table.querySelector('tbody');
 
-  rows.forEach(({ a, u, counts }) => {
+  rows.forEach((row) => {
+    const { a, u } = row;
     const tr = document.createElement('tr');
     const actionBtnStyle = 'width:auto; display:inline-block; box-sizing:border-box; padding:4px 12px; font-size:0.74rem; font-weight:normal; line-height:1.4; border-radius:20px;';
+    const dataCells = visibleColumnEntries.map(([key, col]) => `
+      <td style="white-space:nowrap;">${col.render ? col.render(row) : escapeHtml(String(col.get(row)))}</td>
+    `).join('');
     const actionsCell = `
       <td style="white-space:nowrap;">
         <button class="primary-btn" style="${actionBtnStyle}" data-action="edit">編集</button>
       </td>
     `;
-    tr.innerHTML = `
-      <td>${escapeHtml(u.name || '(無記名)')}</td>
-      <td style="white-space:nowrap;">${escapeHtml(a.loginId || '-')}</td>
-      <td style="white-space:nowrap;">${escapeHtml(ROLE_LABELS[a.role] || a.role)}</td>
-      <td style="white-space:nowrap;">${escapeHtml(u.birthday || '-')}</td>
-      <td style="white-space:nowrap;">${fmtTimestamp(u.updatedAt)}</td>
-      <td style="white-space:nowrap;">${counts.bronze}</td>
-      <td style="white-space:nowrap;">${counts.silver}</td>
-      <td style="white-space:nowrap;">${counts.gold}</td>
-      <td style="white-space:nowrap;">${counts.legend}</td>
-      <td style="white-space:nowrap;">${u.totalLikesGiven ?? 0}</td>
-      <td style="white-space:nowrap;">${u.totalLikesReceived ?? 0}</td>
-      ${actionsCell}
-    `;
+    tr.innerHTML = dataCells + actionsCell;
     tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditor(a.omikujiUserId, u, a));
     tbody.appendChild(tr);
   });
