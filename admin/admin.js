@@ -24,6 +24,14 @@ const SAVED_IMAGE_SITES = [
   { id: 'starrailRankingElement', label: '推しキャラランキング【スタレ・属性】' },
   { id: 'genshinCheck', label: '#原神チェックシート' },
   { id: 'starrailCheck', label: '#スタレチェックシート' },
+  { id: 'genshinFreeFormat', label: '#原神フリーフォーマット' },
+  { id: 'starrailFreeFormat', label: '#スタレフリーフォーマット' },
+  { id: 'soukanzu', label: '相関図メーカー' },
+  { id: 'bunpuzu', label: '分布図メーカー' },
+  { id: 'randomSelect', label: 'ランダムピックシート' },
+  { id: 'playMakerGenshin', label: '画面メーカー【原神】' },
+  { id: 'playMakerStarrail', label: '画面メーカー【スタレ】' },
+  { id: 'playMakerMajokai', label: '画面メーカー【魔女会】' },
 ];
 
 function countByRarity(achievementIds) {
