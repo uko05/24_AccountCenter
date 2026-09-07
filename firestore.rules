@@ -339,6 +339,21 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // ブロック機能(2026-08-28追加)。blocks.js自身のコメントの通り、ここでの制御は
+    // クライアント側の表示フィルターであることが前提の設計なので、他のfriendBoard*
+    // コレクションと同じくオープンにする。
+    match /friendBoardBlocks/{blockId} {
+      allow read, write: if true;
+    }
+
+    // 通報機能(2026-08-28追加)。誰でも通報を作成できるが、閲覧・対応済みフラグの
+    // 更新は管理者のみ(mergeRequestsと同じパターン)。チャットのスナップショット等
+    // 機微な内容を含むため、一般ユーザーには読ませない。
+    match /friendBoardReports/{reportId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
     // ===== 17_storage(スクショ保管庫) =====
     // ログイン必須サイト。ownerUidはFirebase Authのuidそのもの(FriendBoard等と違い
     // accountLinks経由の共有匿名IDにはしていない、17_storageは登録済みログイン
