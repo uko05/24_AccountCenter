@@ -55,6 +55,14 @@
         { "fieldPath": "ownerUid", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "screenshotStorageImages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "moderationStatus", "order": "ASCENDING" },
+        { "fieldPath": "flaggedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

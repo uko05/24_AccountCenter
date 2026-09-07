@@ -4,6 +4,7 @@
 
 const { onObjectFinalized } = require('firebase-functions/v2/storage');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 const vision = require('@google-cloud/vision');
@@ -71,7 +72,8 @@ exports.moderateStorageUpload = onObjectFinalized(async (event) => {
   );
 
   if (worstRank >= likelihoodRank('VERY_LIKELY')) {
-    await deleteImageFiles(bucketName, uid, imageId);
+    // ファイルの実削除はcleanupRemovedImage(Firestoreのmoderationstatus更新
+    // トリガー)に一本化している。ここではステータスを変えるだけでよい。
     await docRef.set({
       moderationStatus: 'removed',
       shareEnabled: false,
@@ -102,10 +104,6 @@ exports.sweepFlaggedImages = onSchedule('every 24 hours', async () => {
     .get();
 
   for (const docSnap of snap.docs) {
-    const { ownerUid } = docSnap.data();
-    if (ownerUid) {
-      await deleteImageFiles(admin.storage().bucket().name, ownerUid, docSnap.id);
-    }
     await docSnap.ref.set({
       moderationStatus: 'removed',
       shareEnabled: false,
@@ -113,4 +111,16 @@ exports.sweepFlaggedImages = onSchedule('every 24 hours', async () => {
       autoRemovedReason: 'flagged_7day_sweep',
     }, { merge: true });
   }
+});
+
+// moderationStatusが'removed'になった瞬間(SafeSearchの自動判定、7日一括削除、
+// 管理者の手動却下、いずれの経路でも)、実際のStorageファイルを削除する。
+// 削除処理をここに一本化することで、'removed'にする側は理由を問わず
+// Firestoreの更新だけすればよくなる。
+exports.cleanupRemovedImage = onDocumentUpdated(`${IMAGES_COLLECTION}/{imageId}`, async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (after.moderationStatus !== 'removed' || before.moderationStatus === 'removed') return;
+  if (!after.ownerUid) return;
+  await deleteImageFiles(admin.storage().bucket().name, after.ownerUid, event.params.imageId);
 });
