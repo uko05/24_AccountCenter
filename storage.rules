@@ -18,6 +18,23 @@ service firebase.storage {
         && request.resource.contentType == 'image/jpeg';
     }
 
+    // 17_storage(スクショ保管庫)。ログイン必須サイトなので、savedImagesのような
+    // accountLinks経由の共有匿名IDではなく、Firebase Authのuidをそのままパスに使う
+    // ({uid} = request.auth.uid)。表示用(view.webp)とサムネ(thumb.webp)のみ許可
+    // (クライアント側でリサイズ・圧縮してから保存する設計、原寸は保存しない)。
+    // 読み取りは誰でも可(savedImagesと同じく「URLを知っている人にだけ共有」する
+    // 設計のため。実質のアクセス制御はFirestore側のshareEnabledで行う)。
+    // SafeSearchモデレーション用のCloud Functions(未実装)はAdmin SDK経由で
+    // 動く想定なので、このルールの対象外(Admin SDKはルールを無視できる)。
+    match /screenshotStorage/{uid}/{imageId}/{filename} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && filename in ['view.webp', 'thumb.webp']
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType == 'image/webp';
+    }
+
     // その他すべて拒否
     match /{allPaths=**} {
       allow read, write: if false;

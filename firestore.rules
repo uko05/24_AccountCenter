@@ -339,6 +339,39 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // ===== 17_storage(スクショ保管庫) =====
+    // ログイン必須サイト。ownerUidはFirebase Authのuidそのもの(FriendBoard等と違い
+    // accountLinks経由の共有匿名IDにはしていない、17_storageは登録済みログイン
+    // ユーザー専用のため)。
+    match /screenshotStorageImages/{imageId} {
+      // 本人は常に読める。本人以外はshareEnabled(承認後に本人が明示的にONにした場合)
+      // だけ読める。共有リンクを未ログインの人が踏めるよう、この分岐はrequest.auth必須にしない。
+      allow read: if (request.auth != null && resource.data.ownerUid == request.auth.uid)
+        || resource.data.shareEnabled == true;
+
+      // 作成時はmoderationStatusを'pending'固定・shareEnabledをfalse固定で強制する
+      // (承認前に公開扱いで作成することを防ぐ)。SafeSearch判定結果への更新は
+      // Cloud Functions(Admin SDK、未実装)側で行うため、ここでは考慮不要。
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.moderationStatus == 'pending'
+        && request.resource.data.shareEnabled == false;
+
+      // 本人はfavorite/tags/shareEnabledだけ変更できる。moderationStatus自体は
+      // クライアントから変更できない(Cloud Functions専用)。shareEnabledをONにできる
+      // のはmoderationStatusが'approved'の時だけ(OFFにする分にはいつでも可)。
+      allow update: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.moderationStatus == resource.data.moderationStatus
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favorite', 'tags', 'shareEnabled'])
+        && (request.resource.data.shareEnabled == false
+            || request.resource.data.shareEnabled == resource.data.shareEnabled
+            || resource.data.moderationStatus == 'approved');
+
+      allow delete: if request.auth != null && resource.data.ownerUid == request.auth.uid;
+    }
+
     // その他すべて拒否
     match /{document=**} {
       allow read, write: if false;
