@@ -45,6 +45,12 @@ service firebase.storage {
               ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']
             && request.resource.size < 30 * 1024 * 1024)
         );
+
+      // 本人による削除(画像削除機能)。上のallow writeはrequest.resourceの
+      // 存在を前提にしたcreate/update用の条件なので、deleteは別に許可する
+      // 必要がある(request.resourceが無いdeleteリクエストでは上の条件が
+      // 常にfalseになり弾かれてしまうため)。
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // その他すべて拒否
