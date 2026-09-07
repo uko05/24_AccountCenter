@@ -18,21 +18,33 @@ service firebase.storage {
         && request.resource.contentType == 'image/jpeg';
     }
 
-    // 17_storage(スクショ保管庫)。ログイン必須サイトなので、savedImagesのような
+    // 17_storage(画像保管庫)。ログイン必須サイトなので、savedImagesのような
     // accountLinks経由の共有匿名IDではなく、Firebase Authのuidをそのままパスに使う
-    // ({uid} = request.auth.uid)。表示用(view.webp)とサムネ(thumb.webp)のみ許可
-    // (クライアント側でリサイズ・圧縮してから保存する設計、原寸は保存しない)。
-    // 読み取りは誰でも可(savedImagesと同じく「URLを知っている人にだけ共有」する
-    // 設計のため。実質のアクセス制御はFirestore側のshareEnabledで行う)。
-    // SafeSearchモデレーション用のCloud Functions(未実装)はAdmin SDK経由で
-    // 動く想定なので、このルールの対象外(Admin SDKはルールを無視できる)。
+    // ({uid} = request.auth.uid)。読み取りは誰でも可(savedImagesと同じく
+    // 「URLを知っている人にだけ共有」する設計のため。実質のアクセス制御は
+    // Firestore側のshareEnabledで行う)。SafeSearchモデレーション用の
+    // Cloud Functions(未実装)はAdmin SDK経由で動く想定なので、このルールの
+    // 対象外(Admin SDKはルールを無視できる)。
+    // - thumb.webp: 一覧用サムネ(常にWebP、小さいので上限も小さい)
+    // - view.webp: 表示用(デフォルトの圧縮フロー、クライアント側でリサイズ済み)
+    // - original.*: UPointでの交換(sitePerks.storage17.originalUpload)で解放される
+    //   「元の画像のまま保存」機能。圧縮しないため許容サイズを大きくしている。
     match /screenshotStorage/{uid}/{imageId}/{filename} {
       allow read: if true;
       allow write: if request.auth != null
         && request.auth.uid == uid
-        && filename in ['view.webp', 'thumb.webp']
-        && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType == 'image/webp';
+        && (
+          (filename == 'thumb.webp'
+            && request.resource.contentType == 'image/webp'
+            && request.resource.size < 5 * 1024 * 1024)
+          || (filename == 'view.webp'
+            && request.resource.contentType == 'image/webp'
+            && request.resource.size < 10 * 1024 * 1024)
+          || (filename.matches('original\\.(png|jpg|webp|gif|bmp)')
+            && request.resource.contentType in
+              ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']
+            && request.resource.size < 30 * 1024 * 1024)
+        );
     }
 
     // その他すべて拒否
