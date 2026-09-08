@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp,
+  doc, getDoc, setDoc, addDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const ACCOUNTS_LOAD_LIMIT = 100;
@@ -126,6 +126,45 @@ document.getElementById('change-pw-form').addEventListener('submit', async (e) =
     } else {
       msgEl.textContent = `変更に失敗しました（${err.code || err.message}）`;
     }
+    msgEl.classList.add('error');
+  }
+});
+
+// ===== メール配信（原神おみくじ・プレゼントボックス） =====
+document.getElementById('mail-broadcast-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const titleEl   = document.getElementById('mail-title');
+  const messageEl = document.getElementById('mail-message');
+  const ticketsEl = document.getElementById('mail-gacha-tickets');
+  const msgEl     = document.getElementById('mail-broadcast-msg');
+  msgEl.classList.remove('ok', 'error');
+
+  const title = titleEl.value.trim();
+  const message = messageEl.value.trim();
+  const gachaTickets = Math.max(0, Math.floor(Number(ticketsEl.value) || 0));
+
+  if (!title) {
+    msgEl.textContent = 'タイトルを入力してください。';
+    msgEl.classList.add('error');
+    return;
+  }
+  if (!confirm(`「${title}」を原神おみくじの全ユーザーのメールボックスに配信します。よろしいですか？`)) return;
+
+  // rewards は claimMail(feed.js)がドット区切りのフィールドパスへそのままincrementするための
+  // 汎用形式。今はガチャ券のみだが、他の付与内容が増えても項目を足すだけで対応できる。
+  const rewards = gachaTickets > 0
+    ? [{ field: 'sitePerks.omikuji.gachaTickets', amount: gachaTickets }]
+    : [];
+
+  try {
+    await addDoc(collection(db, 'omikujiMailBroadcasts'), {
+      title, message, rewards, createdAt: serverTimestamp(),
+    });
+    msgEl.textContent = '配信しました。';
+    msgEl.classList.add('ok');
+    document.getElementById('mail-broadcast-form').reset();
+  } catch (err) {
+    msgEl.textContent = `配信に失敗しました（${err.code || err.message}）`;
     msgEl.classList.add('error');
   }
 });

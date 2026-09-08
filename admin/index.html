@@ -58,6 +58,27 @@
     <p id="change-pw-msg" class="form-msg"></p>
   </section>
 
+  <section class="section" id="mail-broadcast-section">
+    <div class="section-title">メール配信（原神おみくじ・プレゼントボックス）</div>
+    <p class="section-desc">送信すると、原神おみくじの全ユーザーのメールボックスに届きます（各自が「受け取る」を押すまで有効。取り消しはできません）。</p>
+    <form id="mail-broadcast-form">
+      <div class="input-group">
+        <label for="mail-title">タイトル</label>
+        <input type="text" id="mail-title" maxlength="60" required>
+      </div>
+      <div class="input-group">
+        <label for="mail-message">説明</label>
+        <textarea id="mail-message" maxlength="300"></textarea>
+      </div>
+      <div class="input-group">
+        <label for="mail-gacha-tickets">贈るガチャ券の枚数（0なら券なし・メッセージのみ）</label>
+        <input type="number" id="mail-gacha-tickets" min="0" step="1" value="0">
+      </div>
+      <button type="submit" class="primary-btn" style="width:auto; padding:9px 24px;">送信する</button>
+    </form>
+    <p id="mail-broadcast-msg" class="form-msg"></p>
+  </section>
+
   <section class="section" id="requests-section">
     <div class="section-title">機種変申請キュー</div>
     <p class="section-desc">名前・誕生日をもとに候補を検索し、本人と判断できたら「このデータで引き継ぐ」を押してください。</p>
@@ -196,7 +217,7 @@
 
 </main>
 
-<script type="module" src="admin.js?v=10"></script>
+<script type="module" src="admin.js?v=11"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>
