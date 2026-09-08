@@ -63,6 +63,14 @@
         { "fieldPath": "moderationStatus", "order": "ASCENDING" },
         { "fieldPath": "flaggedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "omikujiListings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "endsAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
