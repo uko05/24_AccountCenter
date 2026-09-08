@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, addDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp,
+  doc, getDoc, setDoc, addDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const ACCOUNTS_LOAD_LIMIT = 100;
@@ -143,6 +143,23 @@ document.querySelectorAll('input[name="mail-target-type"]').forEach((r) => {
 });
 updateMailTargetVisibility();
 
+// ===== メールの受け取り期限（デフォルト1か月後、無期限も選べる） =====
+function setDefaultMailExpireDate() {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  const pad = (n) => String(n).padStart(2, '0');
+  document.getElementById('mail-expire-date').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function updateMailExpireVisibility() {
+  const type = getRadioValue('mail-expire-type') || 'date';
+  document.getElementById('mail-expire-date').disabled = type !== 'date';
+}
+document.querySelectorAll('input[name="mail-expire-type"]').forEach((r) => {
+  r.addEventListener('change', updateMailExpireVisibility);
+});
+setDefaultMailExpireDate();
+updateMailExpireVisibility();
+
 document.getElementById('mail-broadcast-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const titleEl   = document.getElementById('mail-title');
@@ -156,11 +173,25 @@ document.getElementById('mail-broadcast-form').addEventListener('submit', async 
   const message = messageEl.value.trim();
   const gachaTickets = Math.max(0, Math.floor(Number(ticketsEl.value) || 0));
   const targetType = getRadioValue('mail-target-type') || 'all';
+  const expireType = getRadioValue('mail-expire-type') || 'date';
 
   if (!title) {
     msgEl.textContent = 'タイトルを入力してください。';
     msgEl.classList.add('error');
     return;
+  }
+
+  let expiresAt = null;
+  if (expireType === 'date') {
+    const expireDateEl = document.getElementById('mail-expire-date');
+    if (!expireDateEl.value) {
+      msgEl.textContent = '受け取り期限の日付を入力してください（無期限にする場合は「無期限」を選んでください）。';
+      msgEl.classList.add('error');
+      return;
+    }
+    // その日の終わり(23:59:59)まで受け取り可能にする
+    const [y, m, d] = expireDateEl.value.split('-').map(Number);
+    expiresAt = Timestamp.fromDate(new Date(y, m - 1, d, 23, 59, 59));
   }
 
   let target = { type: 'all' };
@@ -181,7 +212,8 @@ document.getElementById('mail-broadcast-form').addEventListener('submit', async 
     : target.type === 'role'
       ? `ロール「${ROLE_LABELS[target.role] || target.role}」`
       : `指定した${target.userIds.length}人`;
-  if (!confirm(`「${title}」を${targetDesc}のメールボックスに配信します。よろしいですか？`)) return;
+  const expireDesc = expiresAt ? `${fmtTimestamp(expiresAt)}まで` : '無期限';
+  if (!confirm(`「${title}」を${targetDesc}のメールボックスに配信します（受け取り期限：${expireDesc}）。よろしいですか？`)) return;
 
   // rewards は claimMail(feed.js)がドット区切りのフィールドパスへそのままincrementするための
   // 汎用形式。今はガチャ券のみだが、他の付与内容が増えても項目を足すだけで対応できる。
@@ -191,11 +223,14 @@ document.getElementById('mail-broadcast-form').addEventListener('submit', async 
 
   try {
     await addDoc(collection(db, 'omikujiMailBroadcasts'), {
-      title, message, rewards, target, createdAt: serverTimestamp(),
+      title, message, rewards, target, expiresAt, createdAt: serverTimestamp(),
     });
     msgEl.textContent = '配信しました。';
     msgEl.classList.add('ok');
     document.getElementById('mail-broadcast-form').reset();
+    setDefaultMailExpireDate();
+    updateMailTargetVisibility();
+    updateMailExpireVisibility();
   } catch (err) {
     msgEl.textContent = `配信に失敗しました（${err.code || err.message}）`;
     msgEl.classList.add('error');

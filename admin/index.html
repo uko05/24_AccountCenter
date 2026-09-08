@@ -94,6 +94,14 @@
         <label for="mail-target-users">対象UID（1行に1つ。ユーザー一覧・検索でUIDを確認できます）</label>
         <textarea id="mail-target-users" placeholder="u_xxxxxxxx"></textarea>
       </div>
+      <div class="input-group">
+        <label>受け取り期限</label>
+        <div class="radio-row">
+          <label><input type="radio" name="mail-expire-type" value="date" checked> 期限を指定（デフォルト1か月後）</label>
+          <label><input type="radio" name="mail-expire-type" value="none"> 無期限</label>
+        </div>
+        <input type="date" id="mail-expire-date" style="margin-top:8px;">
+      </div>
       <button type="submit" class="primary-btn" style="width:auto; padding:9px 24px;">送信する</button>
     </form>
     <p id="mail-broadcast-msg" class="form-msg"></p>
@@ -237,7 +245,7 @@
 
 </main>
 
-<script type="module" src="admin.js?v=12"></script>
+<script type="module" src="admin.js?v=13"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>
