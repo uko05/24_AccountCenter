@@ -74,6 +74,26 @@
         <label for="mail-gacha-tickets">贈るガチャ券の枚数（0なら券なし・メッセージのみ）</label>
         <input type="number" id="mail-gacha-tickets" min="0" step="1" value="0">
       </div>
+      <div class="input-group">
+        <label>送信先</label>
+        <div class="radio-row">
+          <label><input type="radio" name="mail-target-type" value="all" checked> 全員</label>
+          <label><input type="radio" name="mail-target-type" value="role"> 特定ロール</label>
+          <label><input type="radio" name="mail-target-type" value="users"> 特定の個人（UID指定）</label>
+        </div>
+      </div>
+      <div class="input-group hidden" id="mail-target-role-group">
+        <label>対象ロール</label>
+        <div class="radio-row">
+          <label><input type="radio" name="mail-target-role" value="general" checked> 一般</label>
+          <label><input type="radio" name="mail-target-role" value="debugger"> デバッガー</label>
+          <label><input type="radio" name="mail-target-role" value="admin"> 管理者</label>
+        </div>
+      </div>
+      <div class="input-group hidden" id="mail-target-users-group">
+        <label for="mail-target-users">対象UID（1行に1つ。ユーザー一覧・検索でUIDを確認できます）</label>
+        <textarea id="mail-target-users" placeholder="u_xxxxxxxx"></textarea>
+      </div>
       <button type="submit" class="primary-btn" style="width:auto; padding:9px 24px;">送信する</button>
     </form>
     <p id="mail-broadcast-msg" class="form-msg"></p>
@@ -217,7 +237,7 @@
 
 </main>
 
-<script type="module" src="admin.js?v=11"></script>
+<script type="module" src="admin.js?v=12"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

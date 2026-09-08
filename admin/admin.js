@@ -131,24 +131,57 @@ document.getElementById('change-pw-form').addEventListener('submit', async (e) =
 });
 
 // ===== メール配信（原神おみくじ・プレゼントボックス） =====
+const MAIL_TARGET_LABELS = { all: '全員', role: '特定ロール', users: '特定の個人' };
+
+function updateMailTargetVisibility() {
+  const type = getRadioValue('mail-target-type') || 'all';
+  document.getElementById('mail-target-role-group').classList.toggle('hidden', type !== 'role');
+  document.getElementById('mail-target-users-group').classList.toggle('hidden', type !== 'users');
+}
+document.querySelectorAll('input[name="mail-target-type"]').forEach((r) => {
+  r.addEventListener('change', updateMailTargetVisibility);
+});
+updateMailTargetVisibility();
+
 document.getElementById('mail-broadcast-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const titleEl   = document.getElementById('mail-title');
   const messageEl = document.getElementById('mail-message');
   const ticketsEl = document.getElementById('mail-gacha-tickets');
+  const usersEl   = document.getElementById('mail-target-users');
   const msgEl     = document.getElementById('mail-broadcast-msg');
   msgEl.classList.remove('ok', 'error');
 
   const title = titleEl.value.trim();
   const message = messageEl.value.trim();
   const gachaTickets = Math.max(0, Math.floor(Number(ticketsEl.value) || 0));
+  const targetType = getRadioValue('mail-target-type') || 'all';
 
   if (!title) {
     msgEl.textContent = 'タイトルを入力してください。';
     msgEl.classList.add('error');
     return;
   }
-  if (!confirm(`「${title}」を原神おみくじの全ユーザーのメールボックスに配信します。よろしいですか？`)) return;
+
+  let target = { type: 'all' };
+  if (targetType === 'role') {
+    target = { type: 'role', role: getRadioValue('mail-target-role') || 'general' };
+  } else if (targetType === 'users') {
+    const userIds = usersEl.value.split('\n').map((s) => s.trim()).filter(Boolean);
+    if (userIds.length === 0) {
+      msgEl.textContent = '対象UIDを1件以上入力してください。';
+      msgEl.classList.add('error');
+      return;
+    }
+    target = { type: 'users', userIds };
+  }
+
+  const targetDesc = target.type === 'all'
+    ? '全員'
+    : target.type === 'role'
+      ? `ロール「${ROLE_LABELS[target.role] || target.role}」`
+      : `指定した${target.userIds.length}人`;
+  if (!confirm(`「${title}」を${targetDesc}のメールボックスに配信します。よろしいですか？`)) return;
 
   // rewards は claimMail(feed.js)がドット区切りのフィールドパスへそのままincrementするための
   // 汎用形式。今はガチャ券のみだが、他の付与内容が増えても項目を足すだけで対応できる。
@@ -158,7 +191,7 @@ document.getElementById('mail-broadcast-form').addEventListener('submit', async 
 
   try {
     await addDoc(collection(db, 'omikujiMailBroadcasts'), {
-      title, message, rewards, createdAt: serverTimestamp(),
+      title, message, rewards, target, createdAt: serverTimestamp(),
     });
     msgEl.textContent = '配信しました。';
     msgEl.classList.add('ok');
