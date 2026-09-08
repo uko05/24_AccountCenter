@@ -294,6 +294,14 @@ service cloud.firestore {
       allow read, create, delete: if true;
     }
 
+    // GenshinOmikuji メールボックス（運営からの一斉配布プレゼント）。
+    // 読み取りは誰でも可、送信(作成)は管理者のみ。更新・削除は不要のため拒否。
+    match /omikujiMailBroadcasts/{mailId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
     // GenshinOmikuji いいね通知（トースト表示＋履歴パネル兼用）
     match /omikujiLikeNotifications/{notifId} {
       allow read, create: if true;
