@@ -74,6 +74,13 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // GenshinOmikuji オークション出品（裏面デザインの出品・入札・即決購入）。
+    // omikujiUsers等と同じく匿名運用のためオープン。入札・即決購入は出品者⇔購入者を
+    // またぐクライアント側トランザクションで完結させる設計のため、他の機能と同水準の信頼モデル。
+    match /omikujiListings/{listingId} {
+      allow read, write: if true;
+    }
+
     // AccountCenter 機種変申請（未登録ユーザーでも送信できるよう作成は誰でも可。
     // 閲覧・処理(更新)・却下(更新)・削除は管理者のみ）
     match /mergeRequests/{requestId} {
