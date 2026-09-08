@@ -65,13 +65,25 @@ exports.moderateStorageUpload = onObjectFinalized(async (event) => {
     return;
   }
 
-  const worstRank = Math.max(
-    likelihoodRank(safeSearch.adult),
-    likelihoodRank(safeSearch.violence),
-    likelihoodRank(safeSearch.racy),
-  );
+  const adultRank    = likelihoodRank(safeSearch.adult);
+  const violenceRank = likelihoodRank(safeSearch.violence);
+  const racyRank     = likelihoodRank(safeSearch.racy);
+  const VERY_LIKELY = likelihoodRank('VERY_LIKELY');
+  const LIKELY      = likelihoodRank('LIKELY');
+  const POSSIBLE    = likelihoodRank('POSSIBLE');
 
-  if (worstRank >= likelihoodRank('VERY_LIKELY')) {
+  // VERY_LIKELYはどのカテゴリでも即削除(ここは緩めない)。
+  const isRemoved = adultRank >= VERY_LIKELY || violenceRank >= VERY_LIKELY || racyRank >= VERY_LIKELY;
+
+  // 保留(flagged)のしきい値: adult/violenceはPOSSIBLEから。racy(際どさ)だけは
+  // LIKELYからに緩めている。原神キャラ等の露出多めな衣装デザインがracyの
+  // POSSIBLEに引っかかりやすく、実害の無い画像が大量に保留されてしまう
+  // 誤検知が確認されたため(2026-09-09)。adult/violenceはより深刻なので
+  // 引き続きPOSSIBLEの時点で人の目を通す。
+  const isFlagged = !isRemoved
+    && (adultRank >= POSSIBLE || violenceRank >= POSSIBLE || racyRank >= LIKELY);
+
+  if (isRemoved) {
     // ファイルの実削除はcleanupRemovedImage(Firestoreのmoderationstatus更新
     // トリガー)に一本化している。ここではステータスを変えるだけでよい。
     await docRef.set({
@@ -79,7 +91,7 @@ exports.moderateStorageUpload = onObjectFinalized(async (event) => {
       shareEnabled: false,
       moderatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
-  } else if (worstRank >= likelihoodRank('POSSIBLE')) {
+  } else if (isFlagged) {
     await docRef.set({
       moderationStatus: 'flagged',
       shareEnabled: false,
