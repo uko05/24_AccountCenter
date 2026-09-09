@@ -65,7 +65,7 @@
       ]
     },
     {
-      "collectionGroup": "omikujiListings",
+      "collectionGroup": "ukoMarketListings",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },

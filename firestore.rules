@@ -74,10 +74,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // GenshinOmikuji オークション出品（裏面デザインの出品・入札・即決購入）。
-    // omikujiUsers等と同じく匿名運用のためオープン。入札・即決購入は出品者⇔購入者を
-    // またぐクライアント側トランザクションで完結させる設計のため、他の機能と同水準の信頼モデル。
-    match /omikujiListings/{listingId} {
+    // うーこの部屋 横断マーケット出品（サイト非依存。今はGenshinOmikujiの裏面デザインのみだが、
+    // 将来他サイトも出品できるよう汎用スキーマにしてある。閲覧・入札・即決購入は26_UkoAuction、
+    // 出品は各サイト側で行う）。omikujiUsers等と同じく匿名運用のためオープン。入札・即決購入は
+    // 出品者⇔購入者をまたぐクライアント側トランザクションで完結させる設計のため、他の機能と同水準の信頼モデル。
+    match /ukoMarketListings/{listingId} {
       allow read, write: if true;
     }
 
