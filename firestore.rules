@@ -391,14 +391,15 @@ service cloud.firestore {
         && request.resource.data.moderationStatus == 'pending'
         && request.resource.data.shareEnabled == false;
 
-      // 本人はfavorite/tags/shareEnabledだけ変更できる。moderationStatus自体は
+      // 本人はtags/shareEnabledだけ変更できる(お気に入り機能は2026-09-10に
+      // 廃止したのでfavoriteはここから外した)。moderationStatus自体は
       // クライアントから変更できない(Cloud Functions専用)。shareEnabledをONにできる
       // のはmoderationStatusが'approved'の時だけ(OFFにする分にはいつでも可)。
       allow update: if request.auth != null
         && resource.data.ownerUid == request.auth.uid
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.moderationStatus == resource.data.moderationStatus
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['favorite', 'tags', 'shareEnabled'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tags', 'shareEnabled'])
         && (request.resource.data.shareEnabled == false
             || request.resource.data.shareEnabled == resource.data.shareEnabled
             || resource.data.moderationStatus == 'approved');
