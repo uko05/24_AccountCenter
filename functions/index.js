@@ -69,19 +69,33 @@ exports.moderateStorageUpload = onObjectFinalized(async (event) => {
   const violenceRank = likelihoodRank(safeSearch.violence);
   const racyRank     = likelihoodRank(safeSearch.racy);
   const VERY_LIKELY = likelihoodRank('VERY_LIKELY');
-  const LIKELY      = likelihoodRank('LIKELY');
   const POSSIBLE    = likelihoodRank('POSSIBLE');
 
-  // VERY_LIKELYはどのカテゴリでも即削除(ここは緩めない)。
+  // 診断用に判定結果を毎回ログへ残す(2026-09-09追加)。以前はスコアを一切
+  // 記録しておらず、なぜ保留になったのか後から追えなかったため。
+  console.log('[moderateStorageUpload] safeSearch result', imageId, {
+    adult: safeSearch.adult, violence: safeSearch.violence, racy: safeSearch.racy,
+  });
+
+  // VERY_LIKELYはどのカテゴリでも即削除(ここは緩めない)。racyも含める
+  // (万一の完全に露骨なケースの保険として)。
   const isRemoved = adultRank >= VERY_LIKELY || violenceRank >= VERY_LIKELY || racyRank >= VERY_LIKELY;
 
-  // 保留(flagged)のしきい値: adult/violenceはPOSSIBLEから。racy(際どさ)だけは
-  // LIKELYからに緩めている。原神キャラ等の露出多めな衣装デザインがracyの
-  // POSSIBLEに引っかかりやすく、実害の無い画像が大量に保留されてしまう
-  // 誤検知が確認されたため(2026-09-09)。adult/violenceはより深刻なので
-  // 引き続きPOSSIBLEの時点で人の目を通す。
-  const isFlagged = !isRemoved
-    && (adultRank >= POSSIBLE || violenceRank >= POSSIBLE || racyRank >= LIKELY);
+  // 保留(flagged)の判定材料からracy(際どさ)は完全に外した(2026-09-09)。
+  // ソシャゲ系キャラは肩出し・デコルテの衣装がデザインとして標準的で、
+  // racyはLIKELY緩和後もそうした健全なイラストを大量に誤検知することが
+  // 確認されたため。adult/violenceはより深刻なので引き続きPOSSIBLEの時点で
+  // 人の目を通す。racyは上のVERY_LIKELY即削除にのみ関与する。
+  const isFlagged = !isRemoved && (adultRank >= POSSIBLE || violenceRank >= POSSIBLE);
+
+  // 判定スコアはFirestore側にも残しておく(Cloud Functionsのログは日数が
+  // 経つと見えなくなるため、後から管理画面で「なぜ保留/削除になったか」を
+  // 確認できるように)。
+  const safeSearchScores = {
+    adult: safeSearch.adult || 'UNKNOWN',
+    violence: safeSearch.violence || 'UNKNOWN',
+    racy: safeSearch.racy || 'UNKNOWN',
+  };
 
   if (isRemoved) {
     // ファイルの実削除はcleanupRemovedImage(Firestoreのmoderationstatus更新
@@ -90,16 +104,19 @@ exports.moderateStorageUpload = onObjectFinalized(async (event) => {
       moderationStatus: 'removed',
       shareEnabled: false,
       moderatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      safeSearchScores,
     }, { merge: true });
   } else if (isFlagged) {
     await docRef.set({
       moderationStatus: 'flagged',
       shareEnabled: false,
       flaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+      safeSearchScores,
     }, { merge: true });
   } else {
     await docRef.set({
       moderationStatus: 'approved',
+      safeSearchScores,
       moderatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   }
