@@ -11,9 +11,11 @@ const ACCOUNTS_LOAD_LIMIT = 100;
 const ACCOUNTS_FETCH_LIMIT = 300;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 import { ACHIEVEMENT_GROUPS as CONNECT10_ACHIEVEMENT_GROUPS } from "https://uko05.github.io/10_connect/public/scripts/achievements.js";
+import { GACHA_DESIGNS } from "https://uko05.github.io/14_GenshinOmikuji/gachaBacks.js";
 import { formatSavedAt } from '../saved-image.js';
 
 const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
+const GACHA_DESIGN_BY_ID = new Map(GACHA_DESIGNS.map((d) => [d.id, d]));
 
 // saved-image.js を使って画像を保存している「画像メーカー系」サイト一覧。
 // savedProfileImages/{sharedUserId} は { [siteId]: {url, updatedAt} } という
@@ -633,6 +635,7 @@ async function openEditor(uid, data, account = null) {
   document.getElementById('edit-likes-received').value = data.totalLikesReceived ?? 0;
   document.getElementById('edit-likes-given').value = data.totalLikesGiven ?? 0;
   document.getElementById('edit-collection').value = (data.collection || []).join('\n');
+  renderEquippedCardBack(data.equippedCardBackId);
 
   document.getElementById('edit-uko-points').value = data.ukoPoints ?? 0;
   const perks = data.sitePerks || {};
@@ -702,6 +705,28 @@ function renderAchievementCheckboxesInto(containerId, groups, achievedSet) {
     groupEl.innerHTML = `<h5>${escapeHtml(group.name)}</h5>${rows}`;
     container.appendChild(groupEl);
   });
+}
+
+// 現在使用中の裏面デザイン(gachaBacks.jsのGACHA_DESIGNSと突き合わせてサムネ表示)。
+// equippedCardBackIdが未設定(null)なら通常のback.png扱いなので、その旨を表示するだけでよい。
+function renderEquippedCardBack(equippedCardBackId) {
+  const container = document.getElementById('edit-equipped-cardback-display');
+  if (!container) return;
+  if (!equippedCardBackId) {
+    container.innerHTML = '通常（未設定）';
+    return;
+  }
+  const design = GACHA_DESIGN_BY_ID.get(equippedCardBackId);
+  if (!design) {
+    container.innerHTML = escapeHtml(`不明なID: ${equippedCardBackId}`);
+    return;
+  }
+  container.innerHTML = `
+    <div style="display:flex; align-items:center; gap:10px;">
+      <img src="${escapeHtml(design.url)}" alt="${escapeHtml(design.name)}" style="width:60px; border-radius:8px; border:1px solid var(--border); display:block;">
+      <span>${escapeHtml(design.name)}</span>
+    </div>
+  `;
 }
 
 // savedProfileImages/{uid} は { [siteId]: {url, updatedAt} } という1ドキュメントに
