@@ -36,6 +36,18 @@ const SAVED_IMAGE_SITES = [
   { id: 'playMakerMajokai', label: '画面メーカー【魔女会】' },
 ];
 
+// cardBacksは新形式{デザインID: 所持数}だが、omikuji側のuserData.jsと同様、
+// 旧形式(所持デザインIDの配列)がまだ残っている場合に備えて正規化する。
+function normalizeCardBacks(cardBacks) {
+  if (!cardBacks) return {};
+  if (Array.isArray(cardBacks)) {
+    const result = {};
+    cardBacks.forEach((id) => { result[id] = 1; });
+    return result;
+  }
+  return cardBacks;
+}
+
 function countByRarity(achievementIds) {
   const counts = { bronze: 0, silver: 0, gold: 0, legend: 0 };
   (achievementIds || []).forEach((id) => {
@@ -348,6 +360,10 @@ const ACCOUNTS_SORT_COLUMNS = {
   legend:    { label: '虹',           width: '1%',   get: (r) => r.counts.legend },
   given:     { label: 'アゲ',         width: '1%',   get: (r) => r.u.totalLikesGiven ?? 0 },
   received:  { label: 'モラ',         width: '1%',   get: (r) => r.u.totalLikesReceived ?? 0 },
+  cardBackCount: {
+    label: '裏面所持数', width: '1%',
+    get: (r) => Object.values(normalizeCardBacks(r.u.cardBacks)).reduce((sum, n) => sum + (n || 0), 0),
+  },
   savedImages: {
     label: '画像保存', width: '1%',
     get: (r) => (r.hasSavedImages ? 1 : 0),
@@ -636,6 +652,7 @@ async function openEditor(uid, data, account = null) {
   document.getElementById('edit-likes-given').value = data.totalLikesGiven ?? 0;
   document.getElementById('edit-collection').value = (data.collection || []).join('\n');
   renderEquippedCardBack(data.equippedCardBackId);
+  renderOwnedCardBacks(data.cardBacks);
 
   document.getElementById('edit-uko-points').value = data.ukoPoints ?? 0;
   const perks = data.sitePerks || {};
@@ -727,6 +744,33 @@ function renderEquippedCardBack(equippedCardBackId) {
       <span>${escapeHtml(design.name)}</span>
     </div>
   `;
+}
+
+// cardBacksは{ デザインID: 所持数 }。gachaBacks.jsのGACHA_DESIGNSと突き合わせて
+// サムネ＋所持数を一覧表示する(所持数が多い順)。
+function renderOwnedCardBacks(cardBacks) {
+  const container = document.getElementById('edit-owned-cardbacks');
+  const emptyMsg = document.getElementById('owned-cardbacks-empty-msg');
+  container.innerHTML = '';
+
+  const entries = Object.entries(normalizeCardBacks(cardBacks))
+    .filter(([, count]) => count > 0)
+    .map(([id, count]) => ({ design: GACHA_DESIGN_BY_ID.get(id), id, count }))
+    .sort((x, y) => y.count - x.count);
+
+  emptyMsg.classList.toggle('hidden', entries.length > 0);
+
+  entries.forEach(({ design, id, count }) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'width:100px;';
+    card.innerHTML = design
+      ? `
+        <img src="${escapeHtml(design.url)}" alt="${escapeHtml(design.name)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
+        <p style="font-size:0.72rem; margin-top:4px;">${escapeHtml(design.name)} ×${count}</p>
+      `
+      : `<p style="font-size:0.72rem;">不明なID: ${escapeHtml(id)} ×${count}</p>`;
+    container.appendChild(card);
+  });
 }
 
 // savedProfileImages/{uid} は { [siteId]: {url, updatedAt} } という1ドキュメントに
