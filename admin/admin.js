@@ -364,6 +364,11 @@ const ACCOUNTS_SORT_COLUMNS = {
     label: '裏面所持数', width: '1%',
     get: (r) => Object.values(normalizeCardBacks(r.u.cardBacks)).reduce((sum, n) => sum + (n || 0), 0),
   },
+  cardBackEquipped: {
+    label: '裏面設定中', width: '1%',
+    get: (r) => (r.u.equippedCardBackId ? 1 : 0),
+    render: (r) => (r.u.equippedCardBackId ? '✅' : ''),
+  },
   savedImages: {
     label: '画像保存', width: '1%',
     get: (r) => (r.hasSavedImages ? 1 : 0),
@@ -374,15 +379,21 @@ const ACCOUNTS_SORT_COLUMNS = {
 // 表示する列の選択状態(この管理画面を開いているブラウザだけのローカル設定)。
 // 列が増えて表が窮屈になってきたため、使わない列を個別に隠せるようにしてある。
 const ACCOUNTS_VISIBLE_COLS_KEY = 'adminAccountsVisibleColumns';
+// 追加時点では表が窮屈にならないよう、初期状態は非表示にしておきたい列。
+// (ローカル設定で明示的にON/OFFされれば以後はそちらが優先される)
+const ACCOUNTS_DEFAULT_HIDDEN_COLUMNS = new Set(['cardBackEquipped']);
 function loadVisibleColumns() {
   try {
     const saved = JSON.parse(localStorage.getItem(ACCOUNTS_VISIBLE_COLS_KEY) || '{}');
     const result = {};
-    Object.keys(ACCOUNTS_SORT_COLUMNS).forEach((key) => { result[key] = saved[key] !== false; });
+    Object.keys(ACCOUNTS_SORT_COLUMNS).forEach((key) => {
+      if (key in saved) { result[key] = saved[key] !== false; return; }
+      result[key] = !ACCOUNTS_DEFAULT_HIDDEN_COLUMNS.has(key);
+    });
     return result;
   } catch (e) {
     const result = {};
-    Object.keys(ACCOUNTS_SORT_COLUMNS).forEach((key) => { result[key] = true; });
+    Object.keys(ACCOUNTS_SORT_COLUMNS).forEach((key) => { result[key] = !ACCOUNTS_DEFAULT_HIDDEN_COLUMNS.has(key); });
     return result;
   }
 }
