@@ -28,6 +28,12 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/sharedUserRoles/$(sharedUserId)).data.role == 'admin';
     }
 
+    // ukoMarketListings用: ログイン中のFirebase Authユーザーに紐付いたomikuji ID
+    // (accountLinksで本人確認済みの値のみ返る。呼び出し側でrequest.auth != nullを先に確認すること)
+    function myOmikujiId() {
+      return get(/databases/$(database)/documents/accountLinks/$(request.auth.uid)).data.omikujiUserId;
+    }
+
     // TiersList 票数
     match /bakatareCounts/{character} {
       allow read:   if true;
@@ -76,10 +82,70 @@ service cloud.firestore {
 
     // うーこの部屋 横断マーケット出品（サイト非依存。今はGenshinOmikujiの裏面デザインのみだが、
     // 将来他サイトも出品できるよう汎用スキーマにしてある。閲覧・入札・即決購入は26_UkoAuction、
-    // 出品は各サイト側で行う）。omikujiUsers等と同じく匿名運用のためオープン。入札・即決購入は
-    // 出品者⇔購入者をまたぐクライアント側トランザクションで完結させる設計のため、他の機能と同水準の信頼モデル。
+    // 出品は各サイト側で行う）。実際にUP・アイテムが動く機能のため、他の匿名系コレクションとは
+    // 違い、書き込みはAccountCenterでログイン済み・accountLinksで紐付いたomikuji IDが
+    // sellerId/currentBidderId/soldTo等と一致する場合のみ許可する（なりすまし防止）。
+    // ※omikujiUsers自体は引き続きオープンなので、これだけで経済圏全体が安全になるわけではない
+    // （直接omikujiUsersを書き換えるUP詐称は別問題として残る）が、出品・入札・即決購入の
+    // なりすましは防げる。
     match /ukoMarketListings/{listingId} {
-      allow read, write: if true;
+      allow read: if true;
+
+      // 出品作成: ログイン済み・sellerIdが自分のomikuji ID・初期状態が正しい形であることを要求。
+      // returnFieldはcardBacks.<itemId>固定にする(ここを別フィールド名にされると、精算時の
+      // increment()が他のフィールド、例えばukoPointsの加算と衝突・相殺されてしまうため)。
+      allow create: if request.auth != null
+        && request.resource.data.sellerId == myOmikujiId()
+        && request.resource.data.status == 'active'
+        && request.resource.data.currentBid == 0
+        && request.resource.data.currentBidderId == null
+        && request.resource.data.soldPrice == null
+        && request.resource.data.soldTo == null
+        && request.resource.data.soldVia == null
+        && request.resource.data.startPrice is number && request.resource.data.startPrice > 0
+        && request.resource.data.buyNowPrice is number && request.resource.data.buyNowPrice > request.resource.data.startPrice
+        && request.resource.data.endsAt is timestamp
+        && request.resource.data.returnField == 'cardBacks.' + request.resource.data.itemId;
+
+      // 入札: ログイン済み・自分のomikuji IDでの入札のみ・出品者本人の入札は禁止・
+      // 金額は現在の入札額(未入札なら開始価格)より大きい・対象以外のフィールドは変更不可。
+      allow update: if request.auth != null
+        && resource.data.status == 'active'
+        && resource.data.endsAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentBid', 'currentBidderId', 'currentBidderName'])
+        && request.resource.data.currentBidderId == myOmikujiId()
+        && request.resource.data.currentBidderId != resource.data.sellerId
+        && request.resource.data.currentBid is number
+        && request.resource.data.currentBid > (resource.data.currentBid > 0 ? resource.data.currentBid : resource.data.startPrice - 1);
+
+      // 即決購入: ログイン済み・自分のomikuji IDでの購入のみ・出品者本人は禁止・
+      // 価格は即決価格と一致・active→soldへの遷移のみ。
+      allow update: if request.auth != null
+        && resource.data.status == 'active'
+        && resource.data.endsAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo'])
+        && request.resource.data.status == 'sold'
+        && request.resource.data.soldVia == 'buyNow'
+        && request.resource.data.soldPrice == resource.data.buyNowPrice
+        && request.resource.data.soldTo == myOmikujiId()
+        && request.resource.data.soldTo != resource.data.sellerId;
+
+      // 精算(期限切れの決済): 26_UkoAuctionを開いた誰かが代わりにトリガーする設計のため
+      // 認証不要で許可する。ただし期限切れ・active状態のリストにしか適用できず、結果も
+      // 既存のcurrentBidderId/currentBidと矛盾しない値にしか変更できないようにする。
+      allow update: if resource.data.status == 'active'
+        && resource.data.endsAt <= request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo'])
+        && (
+          (resource.data.currentBidderId != null
+            && request.resource.data.status == 'sold'
+            && request.resource.data.soldVia == 'bid'
+            && request.resource.data.soldPrice == resource.data.currentBid
+            && request.resource.data.soldTo == resource.data.currentBidderId)
+          || (resource.data.currentBidderId == null && request.resource.data.status == 'unsold')
+        );
+
+      allow delete: if false;
     }
 
     // AccountCenter 機種変申請（未登録ユーザーでも送信できるよう作成は誰でも可。
