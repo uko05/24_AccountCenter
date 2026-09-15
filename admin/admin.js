@@ -374,6 +374,10 @@ const ACCOUNTS_SORT_COLUMNS = {
     get: (r) => (r.hasSavedImages ? 1 : 0),
     render: (r) => (r.hasSavedImages ? '✅' : ''),
   },
+  storageImageCount: {
+    label: '画像保管庫', width: '1%',
+    get: (r) => r.storageImageCount || 0,
+  },
 };
 
 // 表示する列の選択状態(この管理画面を開いているブラウザだけのローカル設定)。
@@ -430,11 +434,12 @@ async function loadAccounts() {
 
   // 1度もおみくじを引いたことがない(achStats.totalCountが0)人を除外した上で100件にしたいので、
   // 多めに取得してからフィルタ・切り詰める(除外分を考慮した複合インデックス作成を避けるため)。
-  const [usersSnap, linkSnap, roleSnap, savedImagesSnap] = await Promise.all([
+  const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap] = await Promise.all([
     getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'), limit(ACCOUNTS_FETCH_LIMIT))),
     getDocs(collection(db, 'accountLinks')),
     getDocs(collection(db, 'sharedUserRoles')),
     getDocs(collection(db, 'savedProfileImages')),
+    getDocs(collection(db, 'screenshotStorageImages')),
   ]);
 
   const linkByOmikujiId = new Map();
@@ -454,6 +459,15 @@ async function loadAccounts() {
     if (Object.keys(d.data() || {}).length > 0) hasSavedImagesSet.add(d.id);
   });
 
+  // 17_storage(画像保管庫)。screenshotStorageImages/{imageId}はownerUid(=Firebase Authのuid)
+  // 単位のドキュメントなので、accountLinksのauthUidをキーに件数を集計する。
+  const storageImageCountByAuthUid = new Map();
+  storageImagesSnap.docs.forEach((d) => {
+    const ownerUid = d.data()?.ownerUid;
+    if (!ownerUid) return;
+    storageImageCountByAuthUid.set(ownerUid, (storageImageCountByAuthUid.get(ownerUid) || 0) + 1);
+  });
+
   allAccounts = usersSnap.docs
     .filter((userDoc) => (userDoc.data().achStats?.totalCount || 0) > 0)
     .slice(0, ACCOUNTS_LOAD_LIMIT)
@@ -467,6 +481,7 @@ async function loadAccounts() {
         role: roleByOmikujiId.get(userDoc.id) || 'general',
         omikujiData: userDoc.data(),
         hasSavedImages: hasSavedImagesSet.has(userDoc.id),
+        storageImageCount: link?.authUid ? (storageImageCountByAuthUid.get(link.authUid) || 0) : 0,
       };
     });
 
@@ -494,6 +509,7 @@ function renderAccounts(filterText) {
 
   let rows = filtered.map((a) => ({
     a, u: a.omikujiData, counts: countByRarity(a.omikujiData.achievements), hasSavedImages: a.hasSavedImages,
+    storageImageCount: a.storageImageCount,
   }));
 
   if (accountsSortKey) {
@@ -696,6 +712,18 @@ async function openEditor(uid, data, account = null) {
   const savedImagesSnap = await getDoc(doc(db, 'savedProfileImages', uid));
   renderSavedImages(savedImagesSnap.exists() ? savedImagesSnap.data() : {});
 
+  // 17_storage(画像保管庫)。ownerUid(=Firebase Authのuid)単位のコレクションなので、
+  // AccountCenter未登録(authUid無し)のユーザーはそもそも利用できない。
+  const storage17NotRegisteredMsg = document.getElementById('storage17-not-registered-msg');
+  if (account?.authUid) {
+    storage17NotRegisteredMsg.classList.add('hidden');
+    const storage17Snap = await getDocs(query(collection(db, 'screenshotStorageImages'), where('ownerUid', '==', account.authUid)));
+    renderStorageImages(storage17Snap.docs.map((d) => d.data()));
+  } else {
+    storage17NotRegisteredMsg.classList.remove('hidden');
+    renderStorageImages([]);
+  }
+
   const roleSnap = await getDoc(doc(db, 'sharedUserRoles', uid));
   const roleData = roleSnap.exists() ? roleSnap.data() : {};
   setRadioValue('edit-role', roleData.role || 'general');
@@ -805,6 +833,34 @@ function renderSavedImages(savedImagesData) {
       <img src="${escapeHtml(entry.url)}" alt="${escapeHtml(site.label)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
       <p style="font-size:0.78rem; font-weight:bold; margin-top:6px;">${escapeHtml(site.label)}</p>
       <p style="font-size:0.72rem; color:var(--muted);">${escapeHtml(formatSavedAt(entry.updatedAt))}</p>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// 17_storage(画像保管庫)。screenshotStorageImages/{imageId}を1人分まとめて渡す想定
+// (呼び出し側でownerUidフィルタ済み)。新しい順に並べ、モデレーション状況も添える。
+const STORAGE17_STATUS_LABELS = { pending: '審査中', approved: '承認済み', removed: '削除済み' };
+function renderStorageImages(images) {
+  const container = document.getElementById('edit-storage17-images');
+  const emptyMsg = document.getElementById('storage17-empty-msg');
+  container.innerHTML = '';
+
+  const sorted = images
+    .filter((img) => img.thumbUrl)
+    .slice()
+    .sort((a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0));
+
+  emptyMsg.classList.toggle('hidden', sorted.length > 0);
+
+  sorted.forEach((img) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'width:160px;';
+    const statusLabel = STORAGE17_STATUS_LABELS[img.moderationStatus] || img.moderationStatus || '';
+    card.innerHTML = `
+      <img src="${escapeHtml(img.thumbUrl)}" alt="" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
+      <p style="font-size:0.72rem; color:var(--muted);">${escapeHtml(formatSavedAt(img.createdAt))}</p>
+      <p style="font-size:0.72rem;">${escapeHtml(statusLabel)}${img.shareEnabled ? ' / 共有ON' : ''}</p>
     `;
     container.appendChild(card);
   });

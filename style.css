@@ -272,7 +272,8 @@ footer {
 
 .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 
-table.user-table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+#accounts-list { overflow-x: auto; }
+table.user-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 0.74rem; }
 table.user-table th, table.user-table td {
   border: 1px solid var(--border);
   padding: 4px 6px;

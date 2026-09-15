@@ -163,6 +163,7 @@
       <button type="button" class="admin-tab-btn" data-tab="omikuji">原神おみくじ</button>
       <button type="button" class="admin-tab-btn" data-tab="connect10">コネクトバトル</button>
       <button type="button" class="admin-tab-btn" data-tab="images">画像メーカー</button>
+      <button type="button" class="admin-tab-btn" data-tab="storage17">画像保管庫</button>
     </div>
 
     <div class="admin-tab-panel" data-tab-panel="basic">
@@ -247,6 +248,12 @@
     <div class="admin-tab-panel hidden" data-tab-panel="images">
       <p id="saved-images-empty-msg" class="section-desc hidden">保存された画像はまだありません。</p>
       <div id="edit-saved-images" style="display:flex; flex-wrap:wrap; gap:16px;"></div>
+    </div>
+
+    <div class="admin-tab-panel hidden" data-tab-panel="storage17">
+      <p id="storage17-not-registered-msg" class="section-desc hidden">このユーザーはAccountCenterに未登録のため、画像保管庫は利用できません。</p>
+      <p id="storage17-empty-msg" class="section-desc hidden">登録された画像はまだありません。</p>
+      <div id="edit-storage17-images" style="display:flex; flex-wrap:wrap; gap:16px;"></div>
     </div>
 
     <p id="edit-msg" class="form-msg"></p>
