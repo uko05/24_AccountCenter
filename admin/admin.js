@@ -402,7 +402,7 @@ function renderAuctionHistory(listings) {
     const tr = document.createElement('tr');
     const soldViaLabel = AUCTION_SOLD_VIA_LABELS[item.soldVia] || item.soldVia || '';
     tr.innerHTML = `
-      <td>${item.itemImageUrl ? `<img src="${escapeHtml(item.itemImageUrl)}" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
+      <td>${item.itemImageUrl ? `<img src="${escapeHtml(item.itemImageUrl)}" alt="" data-zoomable="${escapeHtml(item.itemImageUrl)}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
       <td style="white-space:nowrap;">${escapeHtml(item.itemName || item.itemId || '')}</td>
       <td style="white-space:nowrap;">${escapeHtml(item.sellerName || lookupOmikujiName(item.sellerId))}</td>
       <td style="white-space:nowrap;">${escapeHtml(lookupOmikujiName(item.soldTo))}</td>
@@ -415,6 +415,7 @@ function renderAuctionHistory(listings) {
 
   auctionHistoryListEl.innerHTML = '';
   auctionHistoryListEl.appendChild(table);
+  enableThumbnailZoom(auctionHistoryListEl);
 }
 
 // ===== ユーザー一覧（最終更新順、登録・未登録どちらも） =====
@@ -968,10 +969,11 @@ function renderEquippedCardBack(equippedCardBackId) {
   }
   container.innerHTML = `
     <div style="display:flex; align-items:center; gap:10px;">
-      <img src="${escapeHtml(design.url)}" alt="${escapeHtml(design.name)}" style="width:60px; border-radius:8px; border:1px solid var(--border); display:block;">
+      <img src="${escapeHtml(design.url)}" alt="${escapeHtml(design.name)}" data-zoomable="${escapeHtml(design.url)}" style="width:60px; border-radius:8px; border:1px solid var(--border); display:block;">
       <span>${escapeHtml(design.name)}</span>
     </div>
   `;
+  enableThumbnailZoom(container);
 }
 
 // cardBacksは{ デザインID: 所持数 }。gachaBacks.jsのGACHA_DESIGNSと突き合わせて
@@ -993,12 +995,13 @@ function renderOwnedCardBacks(cardBacks) {
     card.style.cssText = 'width:100px;';
     card.innerHTML = design
       ? `
-        <img src="${escapeHtml(design.url)}" alt="${escapeHtml(design.name)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
+        <img src="${escapeHtml(design.url)}" alt="${escapeHtml(design.name)}" data-zoomable="${escapeHtml(design.url)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
         <p style="font-size:0.72rem; margin-top:4px;">${escapeHtml(design.name)} ×${count}</p>
       `
       : `<p style="font-size:0.72rem;">不明なID: ${escapeHtml(id)} ×${count}</p>`;
     container.appendChild(card);
   });
+  enableThumbnailZoom(container);
 }
 
 // savedProfileImages/{uid} は { [siteId]: {url, updatedAt} } という1ドキュメントに
@@ -1019,12 +1022,13 @@ function renderSavedImages(savedImagesData) {
     const card = document.createElement('div');
     card.style.cssText = 'width:160px;';
     card.innerHTML = `
-      <img src="${escapeHtml(entry.url)}" alt="${escapeHtml(site.label)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
+      <img src="${escapeHtml(entry.url)}" alt="${escapeHtml(site.label)}" data-zoomable="${escapeHtml(entry.url)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
       <p style="font-size:0.78rem; font-weight:bold; margin-top:6px;">${escapeHtml(site.label)}</p>
       <p style="font-size:0.72rem; color:var(--muted);">${escapeHtml(formatSavedAt(entry.updatedAt))}</p>
     `;
     container.appendChild(card);
   });
+  enableThumbnailZoom(container);
 }
 
 // 17_storage(画像保管庫)。screenshotStorageImages/{imageId}を1人分まとめて渡す想定
@@ -1046,13 +1050,15 @@ function renderStorageImages(images) {
     const card = document.createElement('div');
     card.style.cssText = 'width:160px;';
     const statusLabel = STORAGE17_STATUS_LABELS[img.moderationStatus] || img.moderationStatus || '';
+    const zoomUrl = img.viewUrl || img.thumbUrl;
     card.innerHTML = `
-      <img src="${escapeHtml(img.thumbUrl)}" alt="" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
+      <img src="${escapeHtml(img.thumbUrl)}" alt="" data-zoomable="${escapeHtml(zoomUrl)}" style="width:100%; border-radius:8px; border:1px solid var(--border); display:block;">
       <p style="font-size:0.72rem; color:var(--muted);">${escapeHtml(formatSavedAt(img.createdAt))}</p>
       <p style="font-size:0.72rem;">${escapeHtml(statusLabel)}${img.shareEnabled ? ' / 共有ON' : ''}</p>
     `;
     container.appendChild(card);
   });
+  enableThumbnailZoom(container);
 }
 
 document.getElementById('cancel-edit-btn').addEventListener('click', () => {
@@ -1171,4 +1177,29 @@ function escapeHtml(str) {
   return String(str ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
+}
+
+// ===== サムネイル拡大表示(ユーザー編集画面の各種画像サムネ共通) =====
+const adminLightboxEl = document.getElementById('admin-lightbox');
+const adminLightboxImgEl = document.getElementById('admin-lightbox-img');
+function openAdminLightbox(url) {
+  if (!url || !adminLightboxEl || !adminLightboxImgEl) return;
+  adminLightboxImgEl.src = url;
+  adminLightboxEl.style.display = 'flex';
+}
+function closeAdminLightbox() {
+  if (!adminLightboxEl) return;
+  adminLightboxEl.style.display = 'none';
+  adminLightboxImgEl.src = '';
+}
+adminLightboxEl?.addEventListener('click', closeAdminLightbox);
+
+// 上記renderXxx系はimg要素をinnerHTMLで生成するため、生成後にこれで一括して
+// クリック→拡大を仕込む(サムネのstyleにcursor:zoom-inを付けた要素だけが対象)。
+function enableThumbnailZoom(container) {
+  if (!container) return;
+  container.querySelectorAll('img[data-zoomable]').forEach((img) => {
+    img.style.cursor = 'zoom-in';
+    img.addEventListener('click', () => openAdminLightbox(img.dataset.zoomable));
+  });
 }
