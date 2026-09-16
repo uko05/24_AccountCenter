@@ -99,6 +99,7 @@ service cloud.firestore {
         && request.resource.data.status == 'active'
         && request.resource.data.currentBid == 0
         && request.resource.data.currentBidderId == null
+        && request.resource.data.bidCount == 0
         && request.resource.data.soldPrice == null
         && request.resource.data.soldTo == null
         && request.resource.data.soldVia == null
@@ -109,14 +110,17 @@ service cloud.firestore {
 
       // 入札: ログイン済み・自分のomikuji IDでの入札のみ・出品者本人の入札は禁止・
       // 金額は現在の入札額(未入札なら開始価格)より大きい・対象以外のフィールドは変更不可。
+      // bidCount(入札件数、一覧の並べ替え用)は毎回+1。bidCount未設定の古い出品にも
+      // 対応できるよう、存在しなければ0とみなす。
       allow update: if request.auth != null
         && resource.data.status == 'active'
         && resource.data.endsAt > request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentBid', 'currentBidderId', 'currentBidderName'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentBid', 'currentBidderId', 'currentBidderName', 'bidCount'])
         && request.resource.data.currentBidderId == myOmikujiId()
         && request.resource.data.currentBidderId != resource.data.sellerId
         && request.resource.data.currentBid is number
-        && request.resource.data.currentBid > (resource.data.currentBid > 0 ? resource.data.currentBid : resource.data.startPrice - 1);
+        && request.resource.data.currentBid > (resource.data.currentBid > 0 ? resource.data.currentBid : resource.data.startPrice - 1)
+        && request.resource.data.bidCount == ('bidCount' in resource.data ? resource.data.bidCount : 0) + 1;
 
       // 即決購入: ログイン済み・自分のomikuji IDでの購入のみ・出品者本人は禁止・
       // 価格は即決価格と一致・active→soldへの遷移のみ。
