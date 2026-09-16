@@ -4,11 +4,12 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, addDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp,
+  doc, getDoc, setDoc, addDoc, deleteDoc, deleteField, collection, query, where, orderBy, getDocs, serverTimestamp, Timestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-const ACCOUNTS_LOAD_LIMIT = 100;
-const ACCOUNTS_FETCH_LIMIT = 300;
+// 一覧は件数無制限で全件取得し、表示だけこの件数単位でページ分割する
+// (1ページに全件出すと縦に長くなりすぎるため)。
+const ACCOUNTS_PAGE_SIZE = 100;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 import { ACHIEVEMENT_GROUPS as CONNECT10_ACHIEVEMENT_GROUPS } from "https://uko05.github.io/10_connect/public/scripts/achievements.js";
 import { GACHA_DESIGNS } from "https://uko05.github.io/14_GenshinOmikuji/gachaBacks.js";
@@ -343,6 +344,7 @@ const accountsFilterUnregisteredEl = document.getElementById('accounts-filter-un
 let allAccounts = [];
 let accountsSortKey = null;
 let accountsSortDir = 1; // 1=昇順, -1=降順
+let accountsCurrentPage = 1;
 
 const ROLE_LABELS = { general: '一般', debugger: 'デバッガー', admin: '管理者' };
 
@@ -425,17 +427,16 @@ function renderColumnToggles() {
 renderColumnToggles();
 
 document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
-accountsFilterEl.addEventListener('input', () => renderAccounts(accountsFilterEl.value));
-accountsFilterRegisteredEl.addEventListener('change', () => renderAccounts(accountsFilterEl.value));
-accountsFilterUnregisteredEl.addEventListener('change', () => renderAccounts(accountsFilterEl.value));
+accountsFilterEl.addEventListener('input', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
+accountsFilterRegisteredEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
+accountsFilterUnregisteredEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 
 async function loadAccounts() {
   accountsListEl.innerHTML = '読み込み中…';
+  accountsCurrentPage = 1;
 
-  // 1度もおみくじを引いたことがない(achStats.totalCountが0)人を除外した上で100件にしたいので、
-  // 多めに取得してからフィルタ・切り詰める(除外分を考慮した複合インデックス作成を避けるため)。
   const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap] = await Promise.all([
-    getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'), limit(ACCOUNTS_FETCH_LIMIT))),
+    getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'))),
     getDocs(collection(db, 'accountLinks')),
     getDocs(collection(db, 'sharedUserRoles')),
     getDocs(collection(db, 'savedProfileImages')),
@@ -470,7 +471,6 @@ async function loadAccounts() {
 
   allAccounts = usersSnap.docs
     .filter((userDoc) => (userDoc.data().achStats?.totalCount || 0) > 0)
-    .slice(0, ACCOUNTS_LOAD_LIMIT)
     .map((userDoc) => {
       const link = linkByOmikujiId.get(userDoc.id);
       return {
@@ -500,9 +500,8 @@ function renderAccounts(filterText) {
     return a.loginId.toLowerCase().includes(needle) || (a.omikujiData?.name || '').toLowerCase().includes(needle);
   });
 
-  accountsCountEl.textContent = `${filtered.length} / ${allAccounts.length} 件（最終更新が新しい順に最大${ACCOUNTS_LOAD_LIMIT}件を読み込み）`;
-
   if (filtered.length === 0) {
+    accountsCountEl.textContent = `0 / ${allAccounts.length} 件（最終更新が新しい順）`;
     accountsListEl.innerHTML = '該当するユーザーがいません。';
     return;
   }
@@ -521,6 +520,14 @@ function renderAccounts(filterText) {
       return 0;
     });
   }
+
+  // 全件無制限で読み込んでいるので、表示だけACCOUNTS_PAGE_SIZE単位でページ分割する
+  const totalPages = Math.max(1, Math.ceil(rows.length / ACCOUNTS_PAGE_SIZE));
+  accountsCurrentPage = Math.min(Math.max(1, accountsCurrentPage), totalPages);
+  const pageStart = (accountsCurrentPage - 1) * ACCOUNTS_PAGE_SIZE;
+  const pageRows = rows.slice(pageStart, pageStart + ACCOUNTS_PAGE_SIZE);
+
+  accountsCountEl.textContent = `${filtered.length} / ${allAccounts.length} 件（最終更新が新しい順、${pageStart + 1}〜${pageStart + pageRows.length}件目を表示、${accountsCurrentPage}/${totalPages}ページ）`;
 
   const sortArrow = (key) => (accountsSortKey === key ? (accountsSortDir === 1 ? ' ▲' : ' ▼') : '');
   const visibleColumnEntries = Object.entries(ACCOUNTS_SORT_COLUMNS).filter(([key]) => accountsVisibleColumns[key]);
@@ -541,7 +548,7 @@ function renderAccounts(filterText) {
   `;
   const tbody = table.querySelector('tbody');
 
-  rows.forEach((row) => {
+  pageRows.forEach((row) => {
     const { a, u } = row;
     const tr = document.createElement('tr');
     const actionBtnStyle = 'width:auto; display:inline-block; box-sizing:border-box; padding:4px 12px; font-size:0.74rem; font-weight:normal; line-height:1.4; border-radius:20px;';
@@ -567,12 +574,46 @@ function renderAccounts(filterText) {
         accountsSortKey = key;
         accountsSortDir = 1;
       }
+      accountsCurrentPage = 1;
       renderAccounts(accountsFilterEl.value);
     });
   });
 
   accountsListEl.innerHTML = '';
   accountsListEl.appendChild(table);
+
+  if (totalPages > 1) {
+    const pager = document.createElement('div');
+    pager.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:12px; margin-top:10px;';
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'secondary-btn';
+    prevBtn.style.cssText = 'width:auto; padding:6px 16px;';
+    prevBtn.textContent = '前のページ';
+    prevBtn.disabled = accountsCurrentPage <= 1;
+    prevBtn.addEventListener('click', () => {
+      accountsCurrentPage -= 1;
+      renderAccounts(accountsFilterEl.value);
+    });
+
+    const pageLabel = document.createElement('span');
+    pageLabel.style.cssText = 'font-size:0.82rem;';
+    pageLabel.textContent = `${accountsCurrentPage} / ${totalPages}`;
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'secondary-btn';
+    nextBtn.style.cssText = 'width:auto; padding:6px 16px;';
+    nextBtn.textContent = '次のページ';
+    nextBtn.disabled = accountsCurrentPage >= totalPages;
+    nextBtn.addEventListener('click', () => {
+      accountsCurrentPage += 1;
+      renderAccounts(accountsFilterEl.value);
+    });
+
+    pager.appendChild(prevBtn);
+    pager.appendChild(pageLabel);
+    pager.appendChild(nextBtn);
+    accountsListEl.appendChild(pager);
+  }
 }
 
 async function deleteAccountLink(a) {
