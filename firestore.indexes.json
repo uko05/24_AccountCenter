@@ -65,6 +65,14 @@
       ]
     },
     {
+      "collectionGroup": "screenshotStorageImages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "moderationStatus", "order": "ASCENDING" },
+        { "fieldPath": "flaggedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "ukoMarketListings",
       "queryScope": "COLLECTION",
       "fields": [
