@@ -518,6 +518,17 @@ renderColumnToggles();
 let accountsFilterRoleSet = new Set(Object.keys(ROLE_LABELS));
 let accountsFilterSavedSiteSet = new Set();
 
+// フィルターのチェックボックスでは画面メーカー(原神/スタレ/魔女会)を1つにまとめる
+// (編集画面の内訳表示(renderSavedImages)ではSAVED_IMAGE_SITESをそのまま使うので、
+// そちらは3サイトのまま個別表示される)。
+const PLAY_MAKER_SITE_IDS = ['playMakerGenshin', 'playMakerStarrail', 'playMakerMajokai'];
+const SAVED_IMAGE_FILTER_OPTIONS = [
+  ...SAVED_IMAGE_SITES.filter((site) => !PLAY_MAKER_SITE_IDS.includes(site.id))
+    .map((site) => ({ id: site.id, label: site.label, siteIds: [site.id] })),
+  { id: 'playMaker', label: '画面メーカー', siteIds: PLAY_MAKER_SITE_IDS },
+];
+const SAVED_IMAGE_FILTER_OPTION_BY_ID = new Map(SAVED_IMAGE_FILTER_OPTIONS.map((o) => [o.id, o]));
+
 const filterRolesEl = document.getElementById('accounts-filter-roles');
 function renderFilterRoleToggles() {
   filterRolesEl.innerHTML = Object.entries(ROLE_LABELS).map(([key, label]) => `
@@ -539,10 +550,10 @@ renderFilterRoleToggles();
 
 const filterSavedSitesEl = document.getElementById('accounts-filter-savedimage-sites');
 function renderFilterSavedSiteToggles() {
-  filterSavedSitesEl.innerHTML = SAVED_IMAGE_SITES.map((site) => `
+  filterSavedSitesEl.innerHTML = SAVED_IMAGE_FILTER_OPTIONS.map((opt) => `
     <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;">
-      <input type="checkbox" data-site-key="${site.id}" ${accountsFilterSavedSiteSet.has(site.id) ? 'checked' : ''}>
-      ${escapeHtml(site.label)}
+      <input type="checkbox" data-site-key="${opt.id}" ${accountsFilterSavedSiteSet.has(opt.id) ? 'checked' : ''}>
+      ${escapeHtml(opt.label)}
     </label>
   `).join('');
   filterSavedSitesEl.querySelectorAll('input[data-site-key]').forEach((cb) => {
@@ -642,7 +653,10 @@ function renderAccounts(filterText) {
     if (accountsFilterStorageEl.checked && !(a.storageImageCount > 0)) return false;
     if (accountsFilterSavedAnyEl.checked && !a.hasSavedImages) return false;
     if (accountsFilterSavedSiteSet.size > 0) {
-      const hasAnySelectedSite = [...accountsFilterSavedSiteSet].some((siteId) => a.savedImageSiteIds.has(siteId));
+      const hasAnySelectedSite = [...accountsFilterSavedSiteSet].some((optionId) => {
+        const opt = SAVED_IMAGE_FILTER_OPTION_BY_ID.get(optionId);
+        return opt && opt.siteIds.some((siteId) => a.savedImageSiteIds.has(siteId));
+      });
       if (!hasAnySelectedSite) return false;
     }
     if (!needle) return true;
@@ -849,12 +863,23 @@ document.querySelectorAll('.admin-tab-btn').forEach((btn) => {
   btn.addEventListener('click', () => switchEditTab(btn.dataset.tab));
 });
 
+// 一覧側でどの詳細フィルターを使っているかによって、編集画面を開いた時の
+// デフォルトタブを変える(画面メーカー系→画像メーカー、裏面設定中→おみくじ、
+// 画像保管庫→画像保管庫)。複数該当する場合はこの並び(後勝ち)で優先度をつける。
+function defaultEditTabForCurrentFilter() {
+  let tab = 'basic';
+  if (accountsFilterSavedAnyEl.checked || accountsFilterSavedSiteSet.size > 0) tab = 'images';
+  if (accountsFilterCardBackEl.checked) tab = 'omikuji';
+  if (accountsFilterStorageEl.checked) tab = 'storage17';
+  return tab;
+}
+
 async function openEditor(uid, data, account = null) {
   currentEditUid = uid;
   currentEditData = data;
   currentEditAccount = account;
   currentConnect10DocId = null;
-  switchEditTab('basic');
+  switchEditTab(defaultEditTabForCurrentFilter());
 
   document.getElementById('unregister-btn').classList.toggle('hidden', !account?.isRegistered);
 
