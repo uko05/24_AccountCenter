@@ -89,6 +89,7 @@ onAuthStateChanged(auth, async (user) => {
     whoamiEl.textContent = user.email;
     loadRequests();
     loadAccounts();
+    loadAuctionHistory();
   }
 });
 
@@ -333,6 +334,87 @@ async function renderCandidates(container, req, requestId) {
     });
     container.appendChild(item);
   });
+}
+
+// ===== オークション履歴（落札成立分のみ。流札(unsold)は対象外） =====
+const auctionHistoryListEl = document.getElementById('auction-history-list');
+const auctionHistoryCountEl = document.getElementById('auction-history-count');
+const AUCTION_HISTORY_FETCH_LIMIT = 200;
+const AUCTION_SOLD_VIA_LABELS = { bid: '入札', buyNow: '即決購入' };
+
+document.getElementById('reload-auction-history-btn')?.addEventListener('click', loadAuctionHistory);
+
+async function loadAuctionHistory() {
+  if (!auctionHistoryListEl) return;
+  auctionHistoryListEl.innerHTML = '読み込み中…';
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'ukoMarketListings'),
+      where('status', '==', 'sold'),
+      orderBy('soldAt', 'desc'),
+      limit(AUCTION_HISTORY_FETCH_LIMIT),
+    ));
+    renderAuctionHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  } catch (e) {
+    console.error('[admin] auction history load failed', e);
+    auctionHistoryListEl.innerHTML = '読み込みに失敗しました。';
+  }
+}
+
+// 落札者(soldTo)はomikuji IDしか出品ドキュメントに残っていないため、既に読み込み済みの
+// allAccounts(ユーザー一覧)から名前を逆引きする(未取得なら諦めてIDをそのまま出す)。
+function lookupOmikujiName(omikujiUserId) {
+  const account = allAccounts.find((a) => a.omikujiUserId === omikujiUserId);
+  return account?.omikujiData?.name || omikujiUserId || '';
+}
+
+function renderAuctionHistory(listings) {
+  if (auctionHistoryCountEl) {
+    auctionHistoryCountEl.textContent = listings.length >= AUCTION_HISTORY_FETCH_LIMIT
+      ? `直近${AUCTION_HISTORY_FETCH_LIMIT}件を表示`
+      : `${listings.length}件`;
+  }
+
+  if (listings.length === 0) {
+    auctionHistoryListEl.innerHTML = '落札履歴はまだありません。';
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'user-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th style="width:1%;"></th>
+        <th>アイテム</th>
+        <th>出品者</th>
+        <th>落札者</th>
+        <th>価格</th>
+        <th>方式</th>
+        <th>落札日時</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector('tbody');
+
+  listings.forEach((item) => {
+    const tr = document.createElement('tr');
+    const soldViaLabel = AUCTION_SOLD_VIA_LABELS[item.soldVia] || item.soldVia || '';
+    tr.innerHTML = `
+      <td>${item.itemImageUrl ? `<img src="${escapeHtml(item.itemImageUrl)}" alt="" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
+      <td style="white-space:nowrap;">${escapeHtml(item.itemName || item.itemId || '')}</td>
+      <td style="white-space:nowrap;">${escapeHtml(item.sellerName || lookupOmikujiName(item.sellerId))}</td>
+      <td style="white-space:nowrap;">${escapeHtml(lookupOmikujiName(item.soldTo))}</td>
+      <td style="white-space:nowrap;">${item.soldPrice ?? ''}UP</td>
+      <td style="white-space:nowrap;">${escapeHtml(soldViaLabel)}</td>
+      <td style="white-space:nowrap;">${escapeHtml(formatSavedAt(item.soldAt))}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  auctionHistoryListEl.innerHTML = '';
+  auctionHistoryListEl.appendChild(table);
 }
 
 // ===== ユーザー一覧（最終更新順、登録・未登録どちらも） =====

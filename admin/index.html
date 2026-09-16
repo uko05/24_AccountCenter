@@ -114,9 +114,19 @@
     <div id="requests-list"></div>
   </section>
 
+  <section class="section" id="auction-history-section">
+    <div class="section-title">オークション履歴</div>
+    <p class="section-desc">うーこオークションで落札が成立した出品の履歴です（入札で競り落とされた場合・即決購入のどちらも対象。落札されず流札になったものは含みません）。落札日時が新しい順に最大200件表示します。</p>
+    <button id="reload-auction-history-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+    <div id="auction-history-count" class="section-desc" style="margin:0 0 6px;"></div>
+    <div style="overflow-x:auto;">
+      <div id="auction-history-list"></div>
+    </div>
+  </section>
+
   <section class="section" id="accounts-section">
     <div class="section-title">ユーザー一覧</div>
-    <p class="section-desc">omikujiUsers全体から、1度もおみくじを引いたことがない人を除き、最終更新日が新しい順に最大100件を読み込みます（登録・未登録どちらも対象）。下の欄に入力すると一覧を絞り込みます（一覧は最初に一度だけ読み込み、以降はその場で絞り込むだけなので通信は発生しません）。</p>
+    <p class="section-desc">omikujiUsers全体から、1度もおみくじを引いたことがない人を除き、最終更新日が新しい順に読み込みます（登録・未登録どちらも対象、件数無制限・100件ごとにページ送り）。下の欄に入力すると一覧を絞り込みます（一覧は最初に一度だけ読み込み、以降はその場で絞り込むだけなので通信は発生しません）。</p>
     <button id="reload-accounts-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
     <div class="radio-row" style="margin-bottom:10px;">
       <label><input type="checkbox" id="accounts-filter-registered" checked> 登録済みユーザー</label>
