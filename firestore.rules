@@ -104,7 +104,8 @@ service cloud.firestore {
         && request.resource.data.soldTo == null
         && request.resource.data.soldVia == null
         && request.resource.data.startPrice is number && request.resource.data.startPrice > 0
-        && request.resource.data.buyNowPrice is number && request.resource.data.buyNowPrice > request.resource.data.startPrice
+        && (request.resource.data.buyNowPrice == null
+          || (request.resource.data.buyNowPrice is number && request.resource.data.buyNowPrice > request.resource.data.startPrice))
         && request.resource.data.endsAt is timestamp
         && request.resource.data.returnField == 'cardBacks.' + request.resource.data.itemId;
 
@@ -123,10 +124,13 @@ service cloud.firestore {
         && request.resource.data.bidCount == ('bidCount' in resource.data ? resource.data.bidCount : 0) + 1;
 
       // 即決購入: ログイン済み・自分のomikuji IDでの購入のみ・出品者本人は禁止・
-      // 価格は即決価格と一致・active→soldへの遷移のみ。
+      // 価格は即決価格と一致・active→soldへの遷移のみ。buyNowPriceが無い(即決価格なしの
+      // 出品)場合はそもそもこの経路を使えないようにする(クライアント側でボタンを隠す
+      // だけでなく、ルール側でも二重に防ぐ)。
       allow update: if request.auth != null
         && resource.data.status == 'active'
         && resource.data.endsAt > request.time
+        && resource.data.buyNowPrice is number
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo', 'soldAt'])
         && request.resource.data.status == 'sold'
         && request.resource.data.soldVia == 'buyNow'
