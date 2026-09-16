@@ -423,6 +423,9 @@ const accountsCountEl = document.getElementById('accounts-count');
 const accountsFilterEl = document.getElementById('accounts-filter');
 const accountsFilterRegisteredEl = document.getElementById('accounts-filter-registered');
 const accountsFilterUnregisteredEl = document.getElementById('accounts-filter-unregistered');
+const accountsFilterCardBackEl = document.getElementById('accounts-filter-cardback');
+const accountsFilterStorageEl = document.getElementById('accounts-filter-storage');
+const accountsFilterSavedAnyEl = document.getElementById('accounts-filter-savedimage-any');
 let allAccounts = [];
 let accountsSortKey = null;
 let accountsSortDir = 1; // 1=昇順, -1=降順
@@ -508,10 +511,57 @@ function renderColumnToggles() {
 }
 renderColumnToggles();
 
+// ===== 詳細フィルター: ロール・画像メーカー系(個別) =====
+// どちらも「未選択(空)=絞り込みなし」を基本にしたいが、ロールだけは
+// 3種とも触っていない初期状態で「全ロール表示」にしたいので、初期値は全チェック済みにする。
+let accountsFilterRoleSet = new Set(Object.keys(ROLE_LABELS));
+let accountsFilterSavedSiteSet = new Set();
+
+const filterRolesEl = document.getElementById('accounts-filter-roles');
+function renderFilterRoleToggles() {
+  filterRolesEl.innerHTML = Object.entries(ROLE_LABELS).map(([key, label]) => `
+    <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;">
+      <input type="checkbox" data-role-key="${key}" ${accountsFilterRoleSet.has(key) ? 'checked' : ''}>
+      ${escapeHtml(label)}
+    </label>
+  `).join('');
+  filterRolesEl.querySelectorAll('input[data-role-key]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) accountsFilterRoleSet.add(cb.dataset.roleKey);
+      else accountsFilterRoleSet.delete(cb.dataset.roleKey);
+      accountsCurrentPage = 1;
+      renderAccounts(accountsFilterEl.value);
+    });
+  });
+}
+renderFilterRoleToggles();
+
+const filterSavedSitesEl = document.getElementById('accounts-filter-savedimage-sites');
+function renderFilterSavedSiteToggles() {
+  filterSavedSitesEl.innerHTML = SAVED_IMAGE_SITES.map((site) => `
+    <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;">
+      <input type="checkbox" data-site-key="${site.id}" ${accountsFilterSavedSiteSet.has(site.id) ? 'checked' : ''}>
+      ${escapeHtml(site.label)}
+    </label>
+  `).join('');
+  filterSavedSitesEl.querySelectorAll('input[data-site-key]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) accountsFilterSavedSiteSet.add(cb.dataset.siteKey);
+      else accountsFilterSavedSiteSet.delete(cb.dataset.siteKey);
+      accountsCurrentPage = 1;
+      renderAccounts(accountsFilterEl.value);
+    });
+  });
+}
+renderFilterSavedSiteToggles();
+
 document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
 accountsFilterEl.addEventListener('input', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 accountsFilterRegisteredEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 accountsFilterUnregisteredEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
+accountsFilterCardBackEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
+accountsFilterStorageEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
+accountsFilterSavedAnyEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 
 async function loadAccounts() {
   accountsListEl.innerHTML = '読み込み中…';
@@ -535,11 +585,18 @@ async function loadAccounts() {
   roleSnap.docs.forEach((roleDoc) => roleByOmikujiId.set(roleDoc.id, roleDoc.data().role || 'general'));
 
   // savedProfileImages/{omikujiUserId}は{ [siteId]: {url, updatedAt} }なので、
-  // 一覧では「1つでも画像メーカー系サイトに保存しているか」だけ列で見せる
+  // 一覧の列自体は「1つでも画像メーカー系サイトに保存しているか」だけ見せる
   // (サイトごとの内訳は個別編集画面の「画像メーカー」タブで見られるため)。
+  // フィルターではサイト個別の絞り込みも使いたいので、サイトIDのSetも持っておく。
   const hasSavedImagesSet = new Set();
+  const savedImageSitesByOmikujiId = new Map();
   savedImagesSnap.docs.forEach((d) => {
-    if (Object.keys(d.data() || {}).length > 0) hasSavedImagesSet.add(d.id);
+    const data = d.data() || {};
+    if (Object.keys(data).length > 0) hasSavedImagesSet.add(d.id);
+    const siteIds = new Set(
+      SAVED_IMAGE_SITES.map((site) => site.id).filter((id) => data[id] && data[id].url)
+    );
+    if (siteIds.size > 0) savedImageSitesByOmikujiId.set(d.id, siteIds);
   });
 
   // 17_storage(画像保管庫)。screenshotStorageImages/{imageId}はownerUid(=Firebase Authのuid)
@@ -563,6 +620,7 @@ async function loadAccounts() {
         role: roleByOmikujiId.get(userDoc.id) || 'general',
         omikujiData: userDoc.data(),
         hasSavedImages: hasSavedImagesSet.has(userDoc.id),
+        savedImageSiteIds: savedImageSitesByOmikujiId.get(userDoc.id) || new Set(),
         storageImageCount: link?.authUid ? (storageImageCountByAuthUid.get(link.authUid) || 0) : 0,
       };
     });
@@ -578,6 +636,14 @@ function renderAccounts(filterText) {
   const filtered = allAccounts.filter((a) => {
     if (a.isRegistered && !showRegistered) return false;
     if (!a.isRegistered && !showUnregistered) return false;
+    if (!accountsFilterRoleSet.has(a.role)) return false;
+    if (accountsFilterCardBackEl.checked && !a.omikujiData?.equippedCardBackId) return false;
+    if (accountsFilterStorageEl.checked && !(a.storageImageCount > 0)) return false;
+    if (accountsFilterSavedAnyEl.checked && !a.hasSavedImages) return false;
+    if (accountsFilterSavedSiteSet.size > 0) {
+      const hasAnySelectedSite = [...accountsFilterSavedSiteSet].some((siteId) => a.savedImageSiteIds.has(siteId));
+      if (!hasAnySelectedSite) return false;
+    }
     if (!needle) return true;
     return a.loginId.toLowerCase().includes(needle) || (a.omikujiData?.name || '').toLowerCase().includes(needle);
   });

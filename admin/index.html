@@ -137,6 +137,20 @@
       <input type="text" id="accounts-filter" placeholder="入力するとリアルタイムで絞り込みます">
     </div>
     <details style="margin-bottom:10px;">
+      <summary style="cursor:pointer; font-size:0.85rem; color:#555;">詳細フィルター</summary>
+      <div style="margin-top:8px;">
+        <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">ロール</p>
+        <div id="accounts-filter-roles" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;"></div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;">
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-cardback"> 裏面設定中のみ</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-storage"> 画像保管庫に保存ありのみ</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-savedimage-any"> 画像保存(いずれか)ありのみ</label>
+        </div>
+        <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">画像メーカー系(個別・複数選択でいずれか一致)</p>
+        <div id="accounts-filter-savedimage-sites" style="display:flex; flex-wrap:wrap; gap:8px 14px;"></div>
+      </div>
+    </details>
+    <details style="margin-bottom:10px;">
       <summary style="cursor:pointer; font-size:0.85rem; color:#555;">表示する列を選ぶ</summary>
       <div id="accounts-column-toggles" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:8px;"></div>
     </details>
