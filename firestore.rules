@@ -408,31 +408,60 @@ service cloud.firestore {
     }
 
     // ===== 25_FriendBoard（フレンド募集掲示板） =====
-    // 匿名運用のためomikujiUsers等と同じくオープン。
-    // 承認制(secretFieldKeys指定)の項目は、そもそもfriendBoardPosts/friendBoardApplications
-    // 作成時にクライアント側が値を書き込まない設計にしており、ここでの制限はしていない
-    // （このサイト群全体の方針に合わせ、無認証・匿名信頼モデルのまま統一している）。
+    // 匿名運用のためomikujiUsers等と同じくAuth必須にはしない(Firebase Authでの本人確認が
+    // できる前提のukoMarketListingsとは違い、無登録でも使えることがこのサイトの前提のため)。
+    // ただし一般公開を機に、なりすまし・改ざんにつながる構造的な不整合だけは
+    // 弾くようにする(=ドキュメントIDと埋め込みIDフィールドの整合性、申請の当事者IDが
+    // 後から書き換えられないこと)。本人確認そのものはできないので、悪意を持って
+    // 直接Firestoreを叩けば理論上は回避できる点は変わらない(CLAUDE.md参照)。
 
-    // プロフィール本体（UID・サーバー・推しキャラ等、項目ごとの公開設定を含む）
+    // プロフィール本体（UID・サーバー・推しキャラ等、項目ごとの公開設定を含む）。
+    // ドキュメントIDが既にuserId本人を指しているだけの単純な構造で、埋め込みIDフィールドの
+    // ようなFirestoreルールで検証できる不整合ポイントが無いため、従来通りオープンにする。
     match /friendBoardProfiles/{userId} {
       allow read, write: if true;
     }
 
-    // 募集投稿
+    // 募集投稿。1ユーザー=1投稿でドキュメントIDをuserId本人で固定する設計(board.js参照)
+    // なので、埋め込みのuserIdフィールドがドキュメントIDと一致することだけは強制する
+    // (不一致を許すと、自分のpostIdに他人のuserIdを埋め込んで「その人の投稿」に
+    // 見せかけたなりすまし投稿ができてしまう)。
     match /friendBoardPosts/{postId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if request.resource.data.userId == postId;
+      allow delete: if true;
     }
 
-    // 募集への申請（申請・承認・却下・通知既読フラグ）
+    // 募集への申請（申請・承認・却下・通知既読フラグ）。作成後はpostId・当事者2人のID
+    // (postOwnerUserId/applicantUserId)を書き換えられないようにし、既存の申請を
+    // 乗っ取って当事者をすり替える改ざんを防ぐ。それ以外の応答用フィールド
+    // (status/ownerSeen/applicantSeen/respondedAt/revealedFields/chatMessages)は
+    // 従来通り自由に更新できる(applications.js参照)。
     match /friendBoardApplications/{appId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if request.resource.data.postOwnerUserId is string && request.resource.data.postOwnerUserId.size() > 0
+        && request.resource.data.applicantUserId is string && request.resource.data.applicantUserId.size() > 0
+        && request.resource.data.applicantUserId != request.resource.data.postOwnerUserId;
+      allow update: if request.resource.data.postId == resource.data.postId
+        && request.resource.data.postOwnerUserId == resource.data.postOwnerUserId
+        && request.resource.data.applicantUserId == resource.data.applicantUserId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['status', 'ownerSeen', 'applicantSeen', 'respondedAt', 'revealedFields', 'chatMessages']
+        );
+      allow delete: if false;
     }
 
     // ブロック機能(2026-08-28追加)。blocks.js自身のコメントの通り、ここでの制御は
-    // クライアント側の表示フィルターであることが前提の設計なので、他のfriendBoard*
-    // コレクションと同じくオープンにする。
+    // クライアント側の表示フィルターであることが前提の設計。ドキュメントIDが
+    // `{blockerUserId}_{blockedUserId}`固定(blocks.js参照)なので、その整合性と
+    // 自分自身のブロック禁止だけ強制する。更新(setDocでの部分書き換え)は使わない設計
+    // なのでfalseにする。
     match /friendBoardBlocks/{blockId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create: if blockId == request.resource.data.blockerUserId + '_' + request.resource.data.blockedUserId
+        && request.resource.data.blockerUserId != request.resource.data.blockedUserId;
+      allow update: if false;
+      allow delete: if true;
     }
 
     // 通報機能(2026-08-28追加)。誰でも通報を作成できるが、閲覧・対応済みフラグの
