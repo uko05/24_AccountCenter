@@ -71,6 +71,14 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "endsAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "ukoMarketListings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "soldAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

@@ -123,25 +123,28 @@ service cloud.firestore {
       allow update: if request.auth != null
         && resource.data.status == 'active'
         && resource.data.endsAt > request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo', 'soldAt'])
         && request.resource.data.status == 'sold'
         && request.resource.data.soldVia == 'buyNow'
         && request.resource.data.soldPrice == resource.data.buyNowPrice
         && request.resource.data.soldTo == myOmikujiId()
-        && request.resource.data.soldTo != resource.data.sellerId;
+        && request.resource.data.soldTo != resource.data.sellerId
+        && request.resource.data.soldAt is timestamp;
 
       // 精算(期限切れの決済): 26_UkoAuctionを開いた誰かが代わりにトリガーする設計のため
       // 認証不要で許可する。ただし期限切れ・active状態のリストにしか適用できず、結果も
       // 既存のcurrentBidderId/currentBidと矛盾しない値にしか変更できないようにする。
+      // soldAt(管理画面のオークション履歴用)はsold時のみ必須、unsold時は付けない。
       allow update: if resource.data.status == 'active'
         && resource.data.endsAt <= request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo', 'soldAt'])
         && (
           (resource.data.currentBidderId != null
             && request.resource.data.status == 'sold'
             && request.resource.data.soldVia == 'bid'
             && request.resource.data.soldPrice == resource.data.currentBid
-            && request.resource.data.soldTo == resource.data.currentBidderId)
+            && request.resource.data.soldTo == resource.data.currentBidderId
+            && request.resource.data.soldAt is timestamp)
           || (resource.data.currentBidderId == null && request.resource.data.status == 'unsold')
         );
 
