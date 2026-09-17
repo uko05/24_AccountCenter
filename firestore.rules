@@ -439,7 +439,7 @@ service cloud.firestore {
     // 募集への申請（申請・承認・却下・通知既読フラグ）。作成後はpostId・当事者2人のID
     // (postOwnerUserId/applicantUserId)を書き換えられないようにし、既存の申請を
     // 乗っ取って当事者をすり替える改ざんを防ぐ。それ以外の応答用フィールド
-    // (status/ownerSeen/applicantSeen/respondedAt/revealedFields/chatMessages)は
+    // (status/ownerSeen/applicantSeen/respondedAt/revealedFields/chatMessages/lastChatAt)は
     // 従来通り自由に更新できる(applications.js参照)。
     match /friendBoardApplications/{appId} {
       allow read: if true;
@@ -450,7 +450,7 @@ service cloud.firestore {
         && request.resource.data.postOwnerUserId == resource.data.postOwnerUserId
         && request.resource.data.applicantUserId == resource.data.applicantUserId
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['status', 'ownerSeen', 'applicantSeen', 'respondedAt', 'revealedFields', 'chatMessages']
+          ['status', 'ownerSeen', 'applicantSeen', 'respondedAt', 'revealedFields', 'chatMessages', 'lastChatAt']
         );
       allow delete: if false;
     }
