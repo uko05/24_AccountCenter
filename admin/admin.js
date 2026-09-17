@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, addDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp,
+  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // 一覧は件数無制限で全件取得し、表示だけこの件数単位でページ分割する
@@ -90,6 +90,7 @@ onAuthStateChanged(auth, async (user) => {
     loadRequests();
     loadAccounts();
     loadAuctionHistory();
+    loadCampaigns();
   }
 });
 
@@ -417,6 +418,184 @@ function renderAuctionHistory(listings) {
   auctionHistoryListEl.appendChild(table);
   enableThumbnailZoom(auctionHistoryListEl);
 }
+
+// ===== うーこオークション キャンペーン管理(2026-09-18追加) =====
+// ukoAuctionCampaignsコレクションを直接CRUDする。26_UkoAuction(落札/即決時の
+// sellerBonus/bidderBonus)・14_GenshinOmikuji/auction.js(出品時のlistingBonus/
+// listingCountBonus)の両方がこのコレクションを読んで自動適用するので、ここでの
+// 作成・停止・削除がそのまま両サイトの挙動に反映される(即時反映、両サイトとも
+// onSnapshotで購読しているため)。
+const CAMPAIGN_TYPE_LABELS = {
+  sellerBonus: '出品者ボーナス(落札額×倍率)',
+  listingBonus: '出品即時ボーナス(定額)',
+  listingCountBonus: '出品数ボーナス(段階制)',
+  bidderBonus: '落札者キャッシュバック(落札額の%還元)',
+};
+const campaignListEl = document.getElementById('campaign-list');
+let latestCampaignsAdmin = [];
+
+function updateCampaignFieldVisibility() {
+  const type = document.getElementById('campaign-type')?.value;
+  Object.keys(CAMPAIGN_TYPE_LABELS).forEach((t) => {
+    document.getElementById(`campaign-field-${t}`)?.classList.toggle('hidden', t !== type);
+  });
+}
+document.getElementById('campaign-type')?.addEventListener('change', updateCampaignFieldVisibility);
+updateCampaignFieldVisibility();
+
+document.getElementById('reload-campaigns-btn')?.addEventListener('click', loadCampaigns);
+
+async function loadCampaigns() {
+  if (!campaignListEl) return;
+  campaignListEl.textContent = '読み込み中…';
+  try {
+    const snap = await getDocs(query(collection(db, 'ukoAuctionCampaigns'), orderBy('createdAt', 'desc')));
+    latestCampaignsAdmin = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderCampaigns();
+  } catch (e) {
+    console.error('[admin] campaigns load failed', e);
+    campaignListEl.textContent = '読み込みに失敗しました。';
+  }
+}
+
+function campaignDetailText(c) {
+  if (c.type === 'sellerBonus') return `×${c.multiplier}`;
+  if (c.type === 'listingBonus') return `+${c.bonusAmount}UP`;
+  if (c.type === 'listingCountBonus') return (c.tiers || []).map((t) => `${t.count}件→+${t.bonus}UP`).join(' / ');
+  if (c.type === 'bidderBonus') return `${c.rate}%還元`;
+  return '';
+}
+
+function isCampaignCurrentlyActive(c) {
+  if (!c.enabled) return false;
+  const now = Date.now();
+  return c.startsAt?.toMillis() <= now && now <= c.endsAt?.toMillis();
+}
+
+function renderCampaigns() {
+  if (!campaignListEl) return;
+  if (latestCampaignsAdmin.length === 0) {
+    campaignListEl.textContent = 'まだキャンペーンはありません。';
+    return;
+  }
+  campaignListEl.innerHTML = '';
+  latestCampaignsAdmin.forEach((c) => {
+    const active = isCampaignCurrentlyActive(c);
+    const card = document.createElement('div');
+    card.className = 'request-card';
+    if (!c.enabled) card.style.opacity = '0.55';
+    card.innerHTML = `
+      <h4>${escapeHtml(c.label || '')}${active ? '（開催中）' : ''}</h4>
+      <div style="font-size:0.78rem; color:var(--muted);">
+        ${escapeHtml(CAMPAIGN_TYPE_LABELS[c.type] || c.type)} ／ ${escapeHtml(campaignDetailText(c))}<br>
+        ${fmtTimestamp(c.startsAt)} 〜 ${fmtTimestamp(c.endsAt)}
+      </div>
+      <div class="btn-row">
+        <button class="secondary-btn" data-action="toggle">${c.enabled ? '停止する' : '有効化する'}</button>
+        <button class="danger-btn" data-action="delete">削除</button>
+      </div>
+    `;
+    card.querySelector('[data-action="toggle"]').addEventListener('click', async () => {
+      try {
+        await updateDoc(doc(db, 'ukoAuctionCampaigns', c.id), { enabled: !c.enabled });
+        loadCampaigns();
+      } catch (e) {
+        console.error('[admin] campaign toggle failed', e);
+        alert('操作に失敗しました。');
+      }
+    });
+    card.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+      if (!confirm(`キャンペーン「${c.label || ''}」を削除しますか？（元に戻せません）`)) return;
+      try {
+        await deleteDoc(doc(db, 'ukoAuctionCampaigns', c.id));
+        loadCampaigns();
+      } catch (e) {
+        console.error('[admin] campaign delete failed', e);
+        alert('削除に失敗しました。');
+      }
+    });
+    campaignListEl.appendChild(card);
+  });
+}
+
+document.getElementById('campaign-create-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msgEl = document.getElementById('campaign-create-msg');
+  msgEl.classList.remove('ok', 'error');
+
+  const type = document.getElementById('campaign-type').value;
+  const label = document.getElementById('campaign-label').value.trim();
+  const startsRaw = document.getElementById('campaign-starts').value;
+  const days = Number(document.getElementById('campaign-days').value);
+  const startsAtMs = startsRaw ? new Date(startsRaw).getTime() : NaN;
+
+  if (!label || !Number.isFinite(startsAtMs) || !Number.isFinite(days) || days < 1) {
+    msgEl.textContent = '名前・開始日時・開催日数を入力してください。';
+    msgEl.classList.add('error');
+    return;
+  }
+  const endsAtMs = startsAtMs + days * 24 * 60 * 60 * 1000;
+
+  const campaignData = {
+    type, label, enabled: true,
+    startsAt: Timestamp.fromMillis(startsAtMs),
+    endsAt: Timestamp.fromMillis(endsAtMs),
+    createdAt: serverTimestamp(),
+  };
+
+  if (type === 'sellerBonus') {
+    const multiplier = Number(document.getElementById('campaign-multiplier').value);
+    if (!Number.isFinite(multiplier) || multiplier <= 1) {
+      msgEl.textContent = '倍率は1より大きい数値を入力してください。';
+      msgEl.classList.add('error');
+      return;
+    }
+    campaignData.multiplier = multiplier;
+  } else if (type === 'listingBonus') {
+    const bonusAmount = Number(document.getElementById('campaign-bonusAmount').value);
+    if (!Number.isInteger(bonusAmount) || bonusAmount < 1) {
+      msgEl.textContent = '出品時にもらえるUPを入力してください。';
+      msgEl.classList.add('error');
+      return;
+    }
+    campaignData.bonusAmount = bonusAmount;
+  } else if (type === 'listingCountBonus') {
+    const tiers = [];
+    for (let i = 1; i <= 5; i++) {
+      const count = Number(document.getElementById(`campaign-tier-count-${i}`).value);
+      const bonus = Number(document.getElementById(`campaign-tier-bonus-${i}`).value);
+      if (Number.isInteger(count) && count > 0 && Number.isInteger(bonus) && bonus > 0) tiers.push({ count, bonus });
+    }
+    if (!tiers.length) {
+      msgEl.textContent = '段階設定を1つ以上入力してください。';
+      msgEl.classList.add('error');
+      return;
+    }
+    tiers.sort((a, b) => a.count - b.count);
+    campaignData.tiers = tiers;
+  } else if (type === 'bidderBonus') {
+    const rate = Number(document.getElementById('campaign-rate').value);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      msgEl.textContent = '還元率を入力してください。';
+      msgEl.classList.add('error');
+      return;
+    }
+    campaignData.rate = rate;
+  }
+
+  try {
+    await addDoc(collection(db, 'ukoAuctionCampaigns'), campaignData);
+    msgEl.textContent = 'キャンペーンを作成しました！';
+    msgEl.classList.add('ok');
+    document.getElementById('campaign-create-form').reset();
+    updateCampaignFieldVisibility();
+    loadCampaigns();
+  } catch (err) {
+    console.error('[admin] campaign create failed', err);
+    msgEl.textContent = `作成に失敗しました（${err.code || err.message}）`;
+    msgEl.classList.add('error');
+  }
+});
 
 // ===== ユーザー一覧（最終更新順、登録・未登録どちらも） =====
 const accountsListEl = document.getElementById('accounts-list');
