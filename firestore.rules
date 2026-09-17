@@ -159,6 +159,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // うーこオークションの期間限定キャンペーン(2026-09-18追加)。26_UkoAuctionの管理者画面
+    // から作成・編集し、14_GenshinOmikuji/auction.js(出品時)・26_UkoAuction/script.js
+    // (落札/即決時)の両方がこのコレクションを読んで自動適用する。読み取りは誰でも可、
+    // 書き込みは管理者ロールのみ(friendBoardAnnouncementsと同じ非対称パターン)。
+    match /ukoAuctionCampaigns/{campaignId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     // AccountCenter 機種変申請（未登録ユーザーでも送信できるよう作成は誰でも可。
     // 閲覧・処理(更新)・却下(更新)・削除は管理者のみ）
     match /mergeRequests/{requestId} {
