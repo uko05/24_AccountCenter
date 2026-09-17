@@ -476,6 +476,13 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // お知らせ機能(2026-09-17追加)。全員が読めるが、書き込み(投稿・編集・削除)は
+    // 管理者ロールのみ。通報機能とは逆に、閲覧は誰でも可能にしている点に注意。
+    match /friendBoardAnnouncements/{announcementId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
     // ===== 17_storage(スクショ保管庫) =====
     // ログイン必須サイト。ownerUidはFirebase Authのuidそのもの(FriendBoard等と違い
     // accountLinks経由の共有匿名IDにはしていない、17_storageは登録済みログイン
