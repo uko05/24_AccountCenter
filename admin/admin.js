@@ -393,6 +393,26 @@ function lookupOmikujiName(omikujiUserId) {
   return account?.omikujiData?.name || omikujiUserId || '';
 }
 
+// オークション履歴の出品者/落札者名クリック用: 下のユーザー一覧セクションと同じ
+// openEditor()を呼んで詳細を開く(scrollIntoViewも既存の挙動のまま活きる)。
+// allAccountsはachStats.totalCount>0のユーザーだけなので(loadAccounts参照)、
+// 実績0件のユーザーがオークションに関わっているレアケースに備えてFirestoreへの
+// 直接フォールバックも用意しておく。
+async function openEditorByOmikujiId(omikujiUserId) {
+  if (!omikujiUserId) return;
+  const account = allAccounts.find((a) => a.omikujiUserId === omikujiUserId);
+  if (account) {
+    openEditor(account.omikujiUserId, account.omikujiData, account);
+    return;
+  }
+  const snap = await getDoc(doc(db, 'omikujiUsers', omikujiUserId));
+  if (snap.exists()) {
+    openEditor(snap.id, snap.data());
+  } else {
+    alert('ユーザー情報が見つかりませんでした。');
+  }
+}
+
 // アイテム名・出品者名・落札者名の部分一致(大文字小文字区別なし)と、方式
 // (入札/即決購入)のチェックボックスを組み合わせてlatestAuctionHistoryを絞り込む。
 // 列名クリックでのソートにも対応(AUCTION_HISTORY_SORT_COLUMNS参照)。
@@ -463,18 +483,29 @@ function renderAuctionHistory() {
   // 最大幅+省略記号で切り詰める(フルネームはtitle属性でホバー時に確認できる)。
   const nameCellStyle = 'white-space:nowrap; max-width:90px; overflow:hidden; text-overflow:ellipsis;';
 
+  // 出品者/落札者名はクリックで下のユーザー一覧セクションの詳細編集を開けるように
+  // リンク風にする(openEditorByOmikujiId)。IDが無い(古いデータ等)場合はただのテキスト。
+  const userLinkStyle = 'cursor:pointer; color:#2a6fdb; text-decoration:underline;';
+  const userLinkCell = (name, omikujiId) => (omikujiId
+    ? `<span class="admin-user-link" data-omikuji-id="${escapeHtml(omikujiId)}" style="${userLinkStyle}">${escapeHtml(name)}</span>`
+    : escapeHtml(name));
+
   rows.forEach((r) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${r.item.itemImageUrl ? `<img src="${escapeHtml(r.item.itemImageUrl)}" alt="" data-zoomable="${escapeHtml(r.item.itemImageUrl)}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
       <td style="white-space:nowrap;">${escapeHtml(r.item.itemName || r.item.itemId || '')}</td>
-      <td style="${nameCellStyle}" title="${escapeHtml(r.sellerName)}">${escapeHtml(r.sellerName)}</td>
-      <td style="${nameCellStyle}" title="${escapeHtml(r.buyerName)}">${escapeHtml(r.buyerName)}</td>
+      <td style="${nameCellStyle}" title="${escapeHtml(r.sellerName)}">${userLinkCell(r.sellerName, r.item.sellerId)}</td>
+      <td style="${nameCellStyle}" title="${escapeHtml(r.buyerName)}">${userLinkCell(r.buyerName, r.item.soldTo)}</td>
       <td style="white-space:nowrap;">${r.item.soldPrice ?? ''}UP</td>
       <td style="white-space:nowrap;">${escapeHtml(r.soldViaLabel)}</td>
       <td style="white-space:nowrap;">${escapeHtml(formatSavedAt(r.item.soldAt))}</td>
     `;
     tbody.appendChild(tr);
+  });
+
+  table.querySelectorAll('[data-omikuji-id]').forEach((el) => {
+    el.addEventListener('click', () => openEditorByOmikujiId(el.dataset.omikujiId));
   });
 
   table.querySelectorAll('th[data-sort-key]').forEach((th) => {
@@ -1074,6 +1105,22 @@ document.getElementById('search-btn').addEventListener('click', async () => {
     const userSnap = await getDoc(doc(db, 'omikujiUsers', omikujiUserId));
     if (userSnap.exists()) results.set(userSnap.id, { data: userSnap.data(), viaLoginId: value });
   }
+
+  // 完全一致だけでなく部分一致・前方一致でも見つけられるように、既に読み込み済みの
+  // allAccounts(ユーザー一覧)に対しても大文字小文字を区別しない部分一致でヒットさせる
+  // (Firestoreのwhere('==')は完全一致にしか使えないため、こちらはクライアント側で判定)。
+  // allAccountsはachStats.totalCount>0のユーザーのみを含む(loadAccounts参照)ので、
+  // 実績0件のユーザーを完全一致で見つける経路は上のFirestore直接クエリのままにしてある。
+  const needle = value.toLowerCase();
+  allAccounts.forEach((a) => {
+    if (results.has(a.omikujiUserId)) return;
+    const name = (a.omikujiData?.name || '').toLowerCase();
+    const loginId = (a.loginId || '').toLowerCase();
+    const uid = a.omikujiUserId.toLowerCase();
+    if (name.includes(needle) || loginId.includes(needle) || uid.includes(needle)) {
+      results.set(a.omikujiUserId, { data: a.omikujiData, viaLoginId: loginId.includes(needle) ? a.loginId : null });
+    }
+  });
 
   if (results.size === 0) {
     searchResultsEl.innerHTML = '該当するユーザーが見つかりませんでした。';
