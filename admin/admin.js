@@ -348,6 +348,20 @@ const AUCTION_SOLD_VIA_LABELS = { bid: '入札', buyNow: '即決購入' };
 // 取得済みの履歴をここに保持し、絞り込みはこの配列をその場でフィルターするだけ
 // (通信は発生しない。ユーザー一覧セクションと同じ方式)。
 let latestAuctionHistory = [];
+// 列名クリックでのソート状態(ユーザー一覧セクションのaccountsSortKey/Dirと同じ方式)。
+let auctionHistorySortKey = null;
+let auctionHistorySortDir = 1; // 1=昇順, -1=降順
+// 列定義: key(データ属性・ソートキーに使う)/label(見出し)/get(row)(ソート用の比較値)。
+// rowはitem本体に加え、解決済みのsellerName/buyerName/soldViaLabelを持たせたもの
+// (毎回lookupOmikujiNameを呼び直さずソート・表示の両方で使い回すため)。
+const AUCTION_HISTORY_SORT_COLUMNS = {
+  itemName: { label: 'アイテム', get: (r) => (r.item.itemName || r.item.itemId || '').toLowerCase() },
+  sellerName: { label: '出品者', get: (r) => r.sellerName.toLowerCase() },
+  buyerName: { label: '落札者', get: (r) => r.buyerName.toLowerCase() },
+  soldPrice: { label: '価格', get: (r) => r.item.soldPrice ?? 0 },
+  soldVia: { label: '方式', get: (r) => r.soldViaLabel },
+  soldAt: { label: '落札日時', get: (r) => r.item.soldAt?.toMillis?.() ?? 0 },
+};
 
 document.getElementById('reload-auction-history-btn')?.addEventListener('click', loadAuctionHistory);
 auctionHistoryFilterEl?.addEventListener('input', renderAuctionHistory);
@@ -381,35 +395,56 @@ function lookupOmikujiName(omikujiUserId) {
 
 // アイテム名・出品者名・落札者名の部分一致(大文字小文字区別なし)と、方式
 // (入札/即決購入)のチェックボックスを組み合わせてlatestAuctionHistoryを絞り込む。
+// 列名クリックでのソートにも対応(AUCTION_HISTORY_SORT_COLUMNS参照)。
 function renderAuctionHistory() {
   const keyword = (auctionHistoryFilterEl?.value || '').trim().toLowerCase();
   const showBid = auctionHistoryFilterBidEl ? auctionHistoryFilterBidEl.checked : true;
   const showBuyNow = auctionHistoryFilterBuyNowEl ? auctionHistoryFilterBuyNowEl.checked : true;
 
-  const listings = latestAuctionHistory.filter((item) => {
-    if (item.soldVia === 'bid' && !showBid) return false;
-    if (item.soldVia === 'buyNow' && !showBuyNow) return false;
+  // sellerName/buyerNameはlookupOmikujiNameの呼び直しを避けるため、フィルター・
+  // ソート・表示のどの段階でも使い回せるようここで1回だけ解決しておく。
+  let rows = latestAuctionHistory.map((item) => ({
+    item,
+    sellerName: item.sellerName || lookupOmikujiName(item.sellerId),
+    buyerName: lookupOmikujiName(item.soldTo),
+    soldViaLabel: AUCTION_SOLD_VIA_LABELS[item.soldVia] || item.soldVia || '',
+  })).filter((r) => {
+    if (r.item.soldVia === 'bid' && !showBid) return false;
+    if (r.item.soldVia === 'buyNow' && !showBuyNow) return false;
     if (!keyword) return true;
-    const sellerName = item.sellerName || lookupOmikujiName(item.sellerId);
-    const buyerName = lookupOmikujiName(item.soldTo);
-    const haystack = `${item.itemName || item.itemId || ''} ${sellerName} ${buyerName}`.toLowerCase();
+    const haystack = `${r.item.itemName || r.item.itemId || ''} ${r.sellerName} ${r.buyerName}`.toLowerCase();
     return haystack.includes(keyword);
   });
+
+  if (auctionHistorySortKey) {
+    const getter = AUCTION_HISTORY_SORT_COLUMNS[auctionHistorySortKey].get;
+    rows = rows.slice().sort((x, y) => {
+      const vx = getter(x), vy = getter(y);
+      if (vx < vy) return -1 * auctionHistorySortDir;
+      if (vx > vy) return 1 * auctionHistorySortDir;
+      return 0;
+    });
+  }
 
   if (auctionHistoryCountEl) {
     const totalLabel = latestAuctionHistory.length >= AUCTION_HISTORY_FETCH_LIMIT
       ? `直近${AUCTION_HISTORY_FETCH_LIMIT}件中`
       : `${latestAuctionHistory.length}件中`;
-    auctionHistoryCountEl.textContent = `${totalLabel}${listings.length}件を表示`;
+    auctionHistoryCountEl.textContent = `${totalLabel}${rows.length}件を表示`;
   }
 
   if (!auctionHistoryListEl) return;
-  if (listings.length === 0) {
+  if (rows.length === 0) {
     auctionHistoryListEl.innerHTML = latestAuctionHistory.length === 0
       ? '落札履歴はまだありません。'
       : '条件に一致する履歴がありません。';
     return;
   }
+
+  const sortArrow = (key) => (auctionHistorySortKey === key ? (auctionHistorySortDir === 1 ? ' ▲' : ' ▼') : '');
+  const headerCells = Object.entries(AUCTION_HISTORY_SORT_COLUMNS).map(([key, col]) => `
+    <th data-sort-key="${key}" style="white-space:nowrap; cursor:pointer; user-select:none;">${col.label}${sortArrow(key)}</th>
+  `).join('');
 
   const table = document.createElement('table');
   table.className = 'user-table';
@@ -417,36 +452,42 @@ function renderAuctionHistory() {
     <thead>
       <tr>
         <th style="width:1%;"></th>
-        <th>アイテム</th>
-        <th>出品者</th>
-        <th>落札者</th>
-        <th>価格</th>
-        <th>方式</th>
-        <th>落札日時</th>
+        ${headerCells}
       </tr>
     </thead>
     <tbody></tbody>
   `;
   const tbody = table.querySelector('tbody');
 
-  listings.forEach((item) => {
+  // 出品者/落札者は名前が長いと方式・日時列を押し出して見えなくなるため、
+  // 最大幅+省略記号で切り詰める(フルネームはtitle属性でホバー時に確認できる)。
+  const nameCellStyle = 'white-space:nowrap; max-width:90px; overflow:hidden; text-overflow:ellipsis;';
+
+  rows.forEach((r) => {
     const tr = document.createElement('tr');
-    const soldViaLabel = AUCTION_SOLD_VIA_LABELS[item.soldVia] || item.soldVia || '';
-    const sellerName = item.sellerName || lookupOmikujiName(item.sellerId);
-    const buyerName = lookupOmikujiName(item.soldTo);
-    // 出品者/落札者は名前が長いと方式・日時列を押し出して見えなくなるため、
-    // 最大幅+省略記号で切り詰める(フルネームはtitle属性でホバー時に確認できる)。
-    const nameCellStyle = 'white-space:nowrap; max-width:90px; overflow:hidden; text-overflow:ellipsis;';
     tr.innerHTML = `
-      <td>${item.itemImageUrl ? `<img src="${escapeHtml(item.itemImageUrl)}" alt="" data-zoomable="${escapeHtml(item.itemImageUrl)}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
-      <td style="white-space:nowrap;">${escapeHtml(item.itemName || item.itemId || '')}</td>
-      <td style="${nameCellStyle}" title="${escapeHtml(sellerName)}">${escapeHtml(sellerName)}</td>
-      <td style="${nameCellStyle}" title="${escapeHtml(buyerName)}">${escapeHtml(buyerName)}</td>
-      <td style="white-space:nowrap;">${item.soldPrice ?? ''}UP</td>
-      <td style="white-space:nowrap;">${escapeHtml(soldViaLabel)}</td>
-      <td style="white-space:nowrap;">${escapeHtml(formatSavedAt(item.soldAt))}</td>
+      <td>${r.item.itemImageUrl ? `<img src="${escapeHtml(r.item.itemImageUrl)}" alt="" data-zoomable="${escapeHtml(r.item.itemImageUrl)}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
+      <td style="white-space:nowrap;">${escapeHtml(r.item.itemName || r.item.itemId || '')}</td>
+      <td style="${nameCellStyle}" title="${escapeHtml(r.sellerName)}">${escapeHtml(r.sellerName)}</td>
+      <td style="${nameCellStyle}" title="${escapeHtml(r.buyerName)}">${escapeHtml(r.buyerName)}</td>
+      <td style="white-space:nowrap;">${r.item.soldPrice ?? ''}UP</td>
+      <td style="white-space:nowrap;">${escapeHtml(r.soldViaLabel)}</td>
+      <td style="white-space:nowrap;">${escapeHtml(formatSavedAt(r.item.soldAt))}</td>
     `;
     tbody.appendChild(tr);
+  });
+
+  table.querySelectorAll('th[data-sort-key]').forEach((th) => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sortKey;
+      if (auctionHistorySortKey === key) {
+        auctionHistorySortDir *= -1;
+      } else {
+        auctionHistorySortKey = key;
+        auctionHistorySortDir = 1;
+      }
+      renderAuctionHistory();
+    });
   });
 
   auctionHistoryListEl.innerHTML = '';
