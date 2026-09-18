@@ -340,10 +340,19 @@ async function renderCandidates(container, req, requestId) {
 // ===== オークション履歴（落札成立分のみ。流札(unsold)は対象外） =====
 const auctionHistoryListEl = document.getElementById('auction-history-list');
 const auctionHistoryCountEl = document.getElementById('auction-history-count');
+const auctionHistoryFilterEl = document.getElementById('auction-history-filter');
+const auctionHistoryFilterBidEl = document.getElementById('auction-history-filter-bid');
+const auctionHistoryFilterBuyNowEl = document.getElementById('auction-history-filter-buynow');
 const AUCTION_HISTORY_FETCH_LIMIT = 200;
 const AUCTION_SOLD_VIA_LABELS = { bid: '入札', buyNow: '即決購入' };
+// 取得済みの履歴をここに保持し、絞り込みはこの配列をその場でフィルターするだけ
+// (通信は発生しない。ユーザー一覧セクションと同じ方式)。
+let latestAuctionHistory = [];
 
 document.getElementById('reload-auction-history-btn')?.addEventListener('click', loadAuctionHistory);
+auctionHistoryFilterEl?.addEventListener('input', renderAuctionHistory);
+auctionHistoryFilterBidEl?.addEventListener('change', renderAuctionHistory);
+auctionHistoryFilterBuyNowEl?.addEventListener('change', renderAuctionHistory);
 
 async function loadAuctionHistory() {
   if (!auctionHistoryListEl) return;
@@ -355,7 +364,8 @@ async function loadAuctionHistory() {
       orderBy('soldAt', 'desc'),
       limit(AUCTION_HISTORY_FETCH_LIMIT),
     ));
-    renderAuctionHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    latestAuctionHistory = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderAuctionHistory();
   } catch (e) {
     console.error('[admin] auction history load failed', e);
     auctionHistoryListEl.innerHTML = '読み込みに失敗しました。';
@@ -369,15 +379,35 @@ function lookupOmikujiName(omikujiUserId) {
   return account?.omikujiData?.name || omikujiUserId || '';
 }
 
-function renderAuctionHistory(listings) {
+// アイテム名・出品者名・落札者名の部分一致(大文字小文字区別なし)と、方式
+// (入札/即決購入)のチェックボックスを組み合わせてlatestAuctionHistoryを絞り込む。
+function renderAuctionHistory() {
+  const keyword = (auctionHistoryFilterEl?.value || '').trim().toLowerCase();
+  const showBid = auctionHistoryFilterBidEl ? auctionHistoryFilterBidEl.checked : true;
+  const showBuyNow = auctionHistoryFilterBuyNowEl ? auctionHistoryFilterBuyNowEl.checked : true;
+
+  const listings = latestAuctionHistory.filter((item) => {
+    if (item.soldVia === 'bid' && !showBid) return false;
+    if (item.soldVia === 'buyNow' && !showBuyNow) return false;
+    if (!keyword) return true;
+    const sellerName = item.sellerName || lookupOmikujiName(item.sellerId);
+    const buyerName = lookupOmikujiName(item.soldTo);
+    const haystack = `${item.itemName || item.itemId || ''} ${sellerName} ${buyerName}`.toLowerCase();
+    return haystack.includes(keyword);
+  });
+
   if (auctionHistoryCountEl) {
-    auctionHistoryCountEl.textContent = listings.length >= AUCTION_HISTORY_FETCH_LIMIT
-      ? `直近${AUCTION_HISTORY_FETCH_LIMIT}件を表示`
-      : `${listings.length}件`;
+    const totalLabel = latestAuctionHistory.length >= AUCTION_HISTORY_FETCH_LIMIT
+      ? `直近${AUCTION_HISTORY_FETCH_LIMIT}件中`
+      : `${latestAuctionHistory.length}件中`;
+    auctionHistoryCountEl.textContent = `${totalLabel}${listings.length}件を表示`;
   }
 
+  if (!auctionHistoryListEl) return;
   if (listings.length === 0) {
-    auctionHistoryListEl.innerHTML = '落札履歴はまだありません。';
+    auctionHistoryListEl.innerHTML = latestAuctionHistory.length === 0
+      ? '落札履歴はまだありません。'
+      : '条件に一致する履歴がありません。';
     return;
   }
 

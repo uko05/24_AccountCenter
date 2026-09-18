@@ -115,13 +115,25 @@
   </section>
 
   <section class="section" id="auction-history-section">
-    <div class="section-title">オークション履歴</div>
-    <p class="section-desc">うーこオークションで落札が成立した出品の履歴です（入札で競り落とされた場合・即決購入のどちらも対象。落札されず流札になったものは含みません）。落札日時が新しい順に最大200件表示します。</p>
-    <button id="reload-auction-history-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
-    <div id="auction-history-count" class="section-desc" style="margin:0 0 6px;"></div>
-    <div style="overflow-x:auto;">
-      <div id="auction-history-list"></div>
-    </div>
+    <details id="auction-history-details" open>
+      <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">オークション履歴</summary>
+      <div style="margin-top:14px;">
+        <p class="section-desc">うーこオークションで落札が成立した出品の履歴です（入札で競り落とされた場合・即決購入のどちらも対象。落札されず流札になったものは含みません）。落札日時が新しい順に最大200件表示します。</p>
+        <button id="reload-auction-history-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+        <div class="input-group">
+          <label for="auction-history-filter">絞り込み（アイテム名・出品者・落札者）</label>
+          <input type="text" id="auction-history-filter" placeholder="入力するとリアルタイムで絞り込みます">
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin:8px 0 10px;">
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="auction-history-filter-bid" checked> 入札</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="auction-history-filter-buynow" checked> 即決購入</label>
+        </div>
+        <div id="auction-history-count" class="section-desc" style="margin:0 0 6px;"></div>
+        <div style="overflow-x:auto;">
+          <div id="auction-history-list"></div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <section class="section" id="campaign-management-section">
