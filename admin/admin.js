@@ -432,11 +432,16 @@ function renderAuctionHistory() {
   listings.forEach((item) => {
     const tr = document.createElement('tr');
     const soldViaLabel = AUCTION_SOLD_VIA_LABELS[item.soldVia] || item.soldVia || '';
+    const sellerName = item.sellerName || lookupOmikujiName(item.sellerId);
+    const buyerName = lookupOmikujiName(item.soldTo);
+    // 出品者/落札者は名前が長いと方式・日時列を押し出して見えなくなるため、
+    // 最大幅+省略記号で切り詰める(フルネームはtitle属性でホバー時に確認できる)。
+    const nameCellStyle = 'white-space:nowrap; max-width:90px; overflow:hidden; text-overflow:ellipsis;';
     tr.innerHTML = `
       <td>${item.itemImageUrl ? `<img src="${escapeHtml(item.itemImageUrl)}" alt="" data-zoomable="${escapeHtml(item.itemImageUrl)}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
       <td style="white-space:nowrap;">${escapeHtml(item.itemName || item.itemId || '')}</td>
-      <td style="white-space:nowrap;">${escapeHtml(item.sellerName || lookupOmikujiName(item.sellerId))}</td>
-      <td style="white-space:nowrap;">${escapeHtml(lookupOmikujiName(item.soldTo))}</td>
+      <td style="${nameCellStyle}" title="${escapeHtml(sellerName)}">${escapeHtml(sellerName)}</td>
+      <td style="${nameCellStyle}" title="${escapeHtml(buyerName)}">${escapeHtml(buyerName)}</td>
       <td style="white-space:nowrap;">${item.soldPrice ?? ''}UP</td>
       <td style="white-space:nowrap;">${escapeHtml(soldViaLabel)}</td>
       <td style="white-space:nowrap;">${escapeHtml(formatSavedAt(item.soldAt))}</td>
