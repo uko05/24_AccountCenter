@@ -13,6 +13,7 @@ const ACCOUNTS_PAGE_SIZE = 100;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 import { ACHIEVEMENT_GROUPS as CONNECT10_ACHIEVEMENT_GROUPS } from "https://uko05.github.io/10_connect/public/scripts/achievements.js";
 import { GACHA_DESIGNS } from "https://uko05.github.io/14_GenshinOmikuji/gachaBacks.js";
+import { VISIBILITY_FIELDS, fieldLabel, formatFieldValue } from "https://uko05.github.io/25_FriendBoard/fields.js";
 import { formatSavedAt } from '../saved-image.js';
 
 const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
@@ -752,6 +753,11 @@ const ACCOUNTS_SORT_COLUMNS = {
     label: '画像保管庫', width: '1%',
     get: (r) => r.storageImageCount || 0,
   },
+  friendBoardPost: {
+    label: 'FB登録', width: '1%',
+    get: (r) => (r.hasFriendBoardPost ? 1 : 0),
+    render: (r) => (r.hasFriendBoardPost ? '✅' : ''),
+  },
 };
 
 // 表示する列の選択状態(この管理画面を開いているブラウザだけのローカル設定)。
@@ -865,12 +871,13 @@ async function loadAccounts() {
   accountsListEl.innerHTML = '読み込み中…';
   accountsCurrentPage = 1;
 
-  const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap] = await Promise.all([
+  const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap, friendBoardPostsSnap] = await Promise.all([
     getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'))),
     getDocs(collection(db, 'accountLinks')),
     getDocs(collection(db, 'sharedUserRoles')),
     getDocs(collection(db, 'savedProfileImages')),
     getDocs(collection(db, 'screenshotStorageImages')),
+    getDocs(collection(db, 'friendBoardPosts')),
   ]);
 
   const linkByOmikujiId = new Map();
@@ -881,6 +888,11 @@ async function loadAccounts() {
 
   const roleByOmikujiId = new Map();
   roleSnap.docs.forEach((roleDoc) => roleByOmikujiId.set(roleDoc.id, roleDoc.data().role || 'general'));
+
+  // 原神フレンド承認板(25_FriendBoard)。friendBoardPosts/{userId}はomikujiUsersと同じ
+  // 共有匿名ID(genshinOmikuji_userId)をドキュメントIDにしているので、そのまま存在確認
+  // だけで「登録あり」列を出せる(詳細な中身は編集画面を開いた時に個別取得する)。
+  const hasFriendBoardPostSet = new Set(friendBoardPostsSnap.docs.map((d) => d.id));
 
   // savedProfileImages/{omikujiUserId}は{ [siteId]: {url, updatedAt} }なので、
   // 一覧の列自体は「1つでも画像メーカー系サイトに保存しているか」だけ見せる
@@ -920,6 +932,7 @@ async function loadAccounts() {
         hasSavedImages: hasSavedImagesSet.has(userDoc.id),
         savedImageSiteIds: savedImageSitesByOmikujiId.get(userDoc.id) || new Set(),
         storageImageCount: link?.authUid ? (storageImageCountByAuthUid.get(link.authUid) || 0) : 0,
+        hasFriendBoardPost: hasFriendBoardPostSet.has(userDoc.id),
       };
     });
 
@@ -957,7 +970,7 @@ function renderAccounts(filterText) {
 
   let rows = filtered.map((a) => ({
     a, u: a.omikujiData, counts: countByRarity(a.omikujiData.achievements), hasSavedImages: a.hasSavedImages,
-    storageImageCount: a.storageImageCount,
+    storageImageCount: a.storageImageCount, hasFriendBoardPost: a.hasFriendBoardPost,
   }));
 
   if (accountsSortKey) {
@@ -1226,6 +1239,19 @@ async function openEditor(uid, data, account = null) {
     document.getElementById('edit-connect10-achievements').innerHTML = '';
   }
 
+  // 原神フレンド承認板(25_FriendBoard)。friendBoardPosts/{uid}が「現在掲載中のプロフィール」、
+  // friendBoardProfiles/{uid}が可視性設定に関係なく全項目そのままの生データ(25_FriendBoard
+  // 自身の管理者フィルターと同じデータソース)。両方揃わないと表示に必要な情報が欠けるため、
+  // 並行取得してrenderFriendBoardTabにまとめて渡す。
+  const [fbPostSnap, fbProfileSnap] = await Promise.all([
+    getDoc(doc(db, 'friendBoardPosts', uid)),
+    getDoc(doc(db, 'friendBoardProfiles', uid)),
+  ]);
+  renderFriendBoardTab(
+    fbPostSnap.exists() ? fbPostSnap.data() : null,
+    fbProfileSnap.exists() ? fbProfileSnap.data() : null,
+  );
+
   const savedImagesSnap = await getDoc(doc(db, 'savedProfileImages', uid));
   renderSavedImages(savedImagesSnap.exists() ? savedImagesSnap.data() : {});
 
@@ -1329,6 +1355,44 @@ function renderOwnedCardBacks(cardBacks) {
     container.appendChild(card);
   });
   enableThumbnailZoom(container);
+}
+
+// 原神フレンド承認板(25_FriendBoard)。読み取り専用の情報表示のみ(このタブに編集項目は
+// 無いので、「保存」ボタンを押しても他タブの内容だけが反映され、ここは変わらない)。
+// ラベル・値の文言は25_FriendBoard/fields.jsをそのままimportして使う(このタブ独自に
+// 選択肢の文言を複製すると、向こうで選択肢が増減した時にズレるため)。値は可視性設定
+// (公開/承認後に公開/非公開)に関係なくfriendBoardProfilesの生データをそのまま出す
+// (25_FriendBoard自身の管理者用フィルターも同じ生データを見ているのと同じ考え方)。
+function renderFriendBoardTab(postData, profileData) {
+  const notFoundMsg = document.getElementById('friendboard-not-found-msg');
+  const container = document.getElementById('edit-friendboard');
+  container.innerHTML = '';
+
+  if (!postData) {
+    notFoundMsg.classList.remove('hidden');
+    return;
+  }
+  notFoundMsg.classList.add('hidden');
+
+  const addRow = (label, value) => {
+    const row = document.createElement('div');
+    row.className = 'input-group';
+    row.innerHTML = `<label>${escapeHtml(label)}</label><div class="uid-box">${escapeHtml(value)}</div>`;
+    container.appendChild(row);
+  };
+
+  addRow('掲載状況', '掲載中（friendBoardPostsにドキュメントあり）');
+  addRow('なんでも一言', postData.comment || '（未記入）');
+  addRow('承認制の項目あり', postData.requiresApproval ? 'あり（一部項目は承認後にだけ公開）' : 'なし');
+  addRow('最終更新日時', fmtTimestamp(postData.lastActiveAt));
+
+  if (profileData) {
+    VISIBILITY_FIELDS.forEach((key) => {
+      const text = formatFieldValue(key, profileData[key], 'ja');
+      if (!text) return;
+      addRow(fieldLabel(key, 'ja'), text);
+    });
+  }
 }
 
 // savedProfileImages/{uid} は { [siteId]: {url, updatedAt} } という1ドキュメントに

@@ -268,6 +268,7 @@
     <div class="admin-tab-bar">
       <button type="button" class="admin-tab-btn active" data-tab="basic">基本情報</button>
       <button type="button" class="admin-tab-btn" data-tab="omikuji">原神おみくじ</button>
+      <button type="button" class="admin-tab-btn" data-tab="friendboard">フレンド承認板</button>
       <button type="button" class="admin-tab-btn" data-tab="connect10">コネクトバトル</button>
       <button type="button" class="admin-tab-btn" data-tab="images">画像メーカー</button>
       <button type="button" class="admin-tab-btn" data-tab="storage17">画像保管庫</button>
@@ -345,6 +346,11 @@
         <div id="edit-owned-cardbacks" style="display:flex; flex-wrap:wrap; gap:12px;"></div>
       </div>
       <div id="edit-achievements"></div>
+    </div>
+
+    <div class="admin-tab-panel hidden" data-tab-panel="friendboard">
+      <p id="friendboard-not-found-msg" class="section-desc hidden">このユーザーは原神フレンド承認板に登録していません。</p>
+      <div id="edit-friendboard" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 
     <div class="admin-tab-panel hidden" data-tab-panel="connect10">
