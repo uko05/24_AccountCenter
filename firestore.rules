@@ -81,13 +81,17 @@ service cloud.firestore {
     }
 
     // うーこの部屋 横断マーケット出品（サイト非依存。今はGenshinOmikujiの裏面デザインのみだが、
-    // 将来他サイトも出品できるよう汎用スキーマにしてある。閲覧・入札・即決購入は26_UkoAuction、
+    // 将来他サイトも出品できるよう汎用スキーマにしてある。閲覧・入札は26_UkoAuction、
     // 出品は各サイト側で行う）。実際にUP・アイテムが動く機能のため、他の匿名系コレクションとは
     // 違い、書き込みはAccountCenterでログイン済み・accountLinksで紐付いたomikuji IDが
     // sellerId/currentBidderId/soldTo等と一致する場合のみ許可する（なりすまし防止）。
     // ※omikujiUsers自体は引き続きオープンなので、これだけで経済圏全体が安全になるわけではない
-    // （直接omikujiUsersを書き換えるUP詐称は別問題として残る）が、出品・入札・即決購入の
+    // （直接omikujiUsersを書き換えるUP詐称は別問題として残る）が、出品・入札の
     // なりすましは防げる。
+    // 即決(買い切り)機能は2026-09-19に廃止した(固定500UPの即決価格がガチャ券50UPを大きく
+    // 上回っていたため、メイン垢で安くガチャを回して複製をサブ垢に即決購入させる自演両替の
+    // 抜け道になっていた)。既存の古い出品にbuyNowPriceフィールドが残っていても、
+    // それを使って購入できる経路自体がもう無いので無害。
     match /ukoMarketListings/{listingId} {
       allow read: if true;
 
@@ -104,8 +108,6 @@ service cloud.firestore {
         && request.resource.data.soldTo == null
         && request.resource.data.soldVia == null
         && request.resource.data.startPrice is number && request.resource.data.startPrice > 0
-        && (request.resource.data.buyNowPrice == null
-          || (request.resource.data.buyNowPrice is number && request.resource.data.buyNowPrice > request.resource.data.startPrice))
         && request.resource.data.endsAt is timestamp
         && request.resource.data.returnField == 'cardBacks.' + request.resource.data.itemId;
 
@@ -122,22 +124,6 @@ service cloud.firestore {
         && request.resource.data.currentBid is number
         && request.resource.data.currentBid > (resource.data.currentBid > 0 ? resource.data.currentBid : resource.data.startPrice - 1)
         && request.resource.data.bidCount == ('bidCount' in resource.data ? resource.data.bidCount : 0) + 1;
-
-      // 即決購入: ログイン済み・自分のomikuji IDでの購入のみ・出品者本人は禁止・
-      // 価格は即決価格と一致・active→soldへの遷移のみ。buyNowPriceが無い(即決価格なしの
-      // 出品)場合はそもそもこの経路を使えないようにする(クライアント側でボタンを隠す
-      // だけでなく、ルール側でも二重に防ぐ)。
-      allow update: if request.auth != null
-        && resource.data.status == 'active'
-        && resource.data.endsAt > request.time
-        && resource.data.buyNowPrice is number
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'soldVia', 'soldPrice', 'soldTo', 'soldAt'])
-        && request.resource.data.status == 'sold'
-        && request.resource.data.soldVia == 'buyNow'
-        && request.resource.data.soldPrice == resource.data.buyNowPrice
-        && request.resource.data.soldTo == myOmikujiId()
-        && request.resource.data.soldTo != resource.data.sellerId
-        && request.resource.data.soldAt is timestamp;
 
       // 精算(期限切れの決済): 26_UkoAuctionを開いた誰かが代わりにトリガーする設計のため
       // 認証不要で許可する。ただし期限切れ・active状態のリストにしか適用できず、結果も
@@ -161,7 +147,7 @@ service cloud.firestore {
 
     // うーこオークションの期間限定キャンペーン(2026-09-18追加)。26_UkoAuctionの管理者画面
     // から作成・編集し、14_GenshinOmikuji/auction.js(出品時)・26_UkoAuction/script.js
-    // (落札/即決時)の両方がこのコレクションを読んで自動適用する。読み取りは誰でも可、
+    // (落札時)の両方がこのコレクションを読んで自動適用する。読み取りは誰でも可、
     // 書き込みは管理者ロールのみ(friendBoardAnnouncementsと同じ非対称パターン)。
     match /ukoAuctionCampaigns/{campaignId} {
       allow read: if true;
