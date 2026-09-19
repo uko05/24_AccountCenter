@@ -844,6 +844,14 @@ const CAMPAIGN_TYPE_LABELS = {
   listingCountBonus: '出品数ボーナス(段階制)',
   bidderBonus: '落札者キャッシュバック(落札額の%還元)',
 };
+// 種類ごとの既定バナー(99_SharedImage、2026-09-20追加)。26_UkoAuction/script.jsの
+// 同名の定数と内容を揃えること(画像を差し替えたら両方直す)。ここではプレビュー表示にだけ使う。
+const CAMPAIGN_TYPE_BANNER_URLS = {
+  listingBonus: 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/01_Genshin/auction/%E5%87%BA%E5%93%81%E5%8D%B3%E6%99%82%E3%83%9C%E3%83%BC%E3%83%8A%E3%82%B9.png',
+  sellerBonus: 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/01_Genshin/auction/%E8%90%BD%E6%9C%AD%E6%99%82%E3%83%9C%E3%83%BC%E3%83%8A%E3%82%B9.png',
+  listingCountBonus: 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/01_Genshin/auction/%E5%87%BA%E5%93%81%E6%95%B0%E3%83%9C%E3%83%BC%E3%83%8A%E3%82%B9.png',
+  bidderBonus: 'https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/01_Genshin/auction/%E8%90%BD%E6%9C%AD%E6%99%82%E3%82%AD%E3%83%A3%E3%83%83%E3%82%B7%E3%83%A5%E3%83%90%E3%83%83%E3%82%AF.png',
+};
 const campaignListEl = document.getElementById('campaign-list');
 let latestCampaignsAdmin = [];
 
@@ -903,7 +911,10 @@ function renderCampaigns() {
         ${escapeHtml(CAMPAIGN_TYPE_LABELS[c.type] || c.type)} ／ ${escapeHtml(campaignDetailText(c))}<br>
         ${fmtTimestamp(c.startsAt)} 〜 ${fmtTimestamp(c.endsAt)}
       </div>
-      ${c.bannerImageUrl ? `<img src="${escapeHtml(c.bannerImageUrl)}" alt="" style="max-width:200px; max-height:80px; object-fit:contain; margin-top:6px; border:1px solid var(--border); border-radius:4px;">` : ''}
+      ${(() => {
+        const bannerUrl = c.bannerImageUrl || CAMPAIGN_TYPE_BANNER_URLS[c.type];
+        return bannerUrl ? `<img src="${escapeHtml(bannerUrl)}" alt="" style="max-width:200px; max-height:80px; object-fit:contain; margin-top:6px; border:1px solid var(--border); border-radius:4px;">` : '';
+      })()}
       <div class="btn-row">
         <button class="secondary-btn" data-action="toggle">${c.enabled ? '停止する' : '有効化する'}</button>
         <button class="danger-btn" data-action="delete">削除</button>
