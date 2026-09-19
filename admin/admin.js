@@ -10,6 +10,10 @@ import {
 // 一覧は件数無制限で全件取得し、表示だけこの件数単位でページ分割する
 // (1ページに全件出すと縦に長くなりすぎるため)。
 const ACCOUNTS_PAGE_SIZE = 100;
+// オークション履歴・UP取得履歴系(2026-09-20追加)の1ページあたりの表示件数。
+// ユーザー一覧と違ってこちらは監視用途で件数が多くなりがちなので、デフォルトで
+// 折りたたんでおき(index.html側の<details>にopenを付けない)、ページも小さめにする。
+const HISTORY_PAGE_SIZE = 30;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 import { ACHIEVEMENT_GROUPS as CONNECT10_ACHIEVEMENT_GROUPS } from "https://uko05.github.io/10_connect/public/scripts/achievements.js";
 import { GACHA_DESIGNS } from "https://uko05.github.io/14_GenshinOmikuji/gachaBacks.js";
@@ -90,9 +94,9 @@ onAuthStateChanged(auth, async (user) => {
     whoamiEl.textContent = user.email;
     loadRequests();
     loadAccounts();
-    loadAuctionHistory();
-    loadLikeUpHistory();
-    loadUpLogHistory();
+    // オークション履歴・UP取得履歴系はデフォルトで折りたたんでいるので、ここでは
+    // 読み込まない(該当の<details>を初めて開いた時に遅延読み込みする。toggleイベント
+    // リスナー側を参照)。無駄なFirestore読み取りを避けるため。
     loadCampaigns();
   }
 });
@@ -264,6 +268,37 @@ function fmtTimestamp(ts) {
   return d.toLocaleString('ja-JP');
 }
 
+// ===== ページ送りUI(オークション履歴・UP取得履歴系で共通利用) =====
+// ユーザー一覧(renderAccounts)は導入時期が別で独自実装のままだが、考え方は同じ。
+function buildPagerControls(currentPage, totalPages, onChange) {
+  if (totalPages <= 1) return null;
+  const pager = document.createElement('div');
+  pager.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:12px; margin-top:10px;';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'secondary-btn';
+  prevBtn.style.cssText = 'width:auto; padding:6px 16px;';
+  prevBtn.textContent = '前のページ';
+  prevBtn.disabled = currentPage <= 1;
+  prevBtn.addEventListener('click', () => onChange(currentPage - 1));
+
+  const pageLabel = document.createElement('span');
+  pageLabel.style.cssText = 'font-size:0.82rem;';
+  pageLabel.textContent = `${currentPage} / ${totalPages}`;
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'secondary-btn';
+  nextBtn.style.cssText = 'width:auto; padding:6px 16px;';
+  nextBtn.textContent = '次のページ';
+  nextBtn.disabled = currentPage >= totalPages;
+  nextBtn.addEventListener('click', () => onChange(currentPage + 1));
+
+  pager.appendChild(prevBtn);
+  pager.appendChild(pageLabel);
+  pager.appendChild(nextBtn);
+  return pager;
+}
+
 // ===== 機種変申請キュー =====
 const requestsListEl = document.getElementById('requests-list');
 
@@ -354,6 +389,8 @@ let latestAuctionHistory = [];
 // 列名クリックでのソート状態(ユーザー一覧セクションのaccountsSortKey/Dirと同じ方式)。
 let auctionHistorySortKey = null;
 let auctionHistorySortDir = 1; // 1=昇順, -1=降順
+let auctionHistoryCurrentPage = 1;
+let auctionHistoryLoaded = false; // <details>を初めて開いた時だけ読み込む(デフォルト折りたたみのため)
 // 列定義: key(データ属性・ソートキーに使う)/label(見出し)/get(row)(ソート用の比較値)。
 // rowはitem本体に加え、解決済みのsellerName/buyerName/soldViaLabelを持たせたもの
 // (毎回lookupOmikujiNameを呼び直さずソート・表示の両方で使い回すため)。
@@ -367,9 +404,14 @@ const AUCTION_HISTORY_SORT_COLUMNS = {
 };
 
 document.getElementById('reload-auction-history-btn')?.addEventListener('click', loadAuctionHistory);
-auctionHistoryFilterEl?.addEventListener('input', renderAuctionHistory);
-auctionHistoryFilterBidEl?.addEventListener('change', renderAuctionHistory);
-auctionHistoryFilterBuyNowEl?.addEventListener('change', renderAuctionHistory);
+auctionHistoryFilterEl?.addEventListener('input', () => { auctionHistoryCurrentPage = 1; renderAuctionHistory(); });
+auctionHistoryFilterBidEl?.addEventListener('change', () => { auctionHistoryCurrentPage = 1; renderAuctionHistory(); });
+auctionHistoryFilterBuyNowEl?.addEventListener('change', () => { auctionHistoryCurrentPage = 1; renderAuctionHistory(); });
+// デフォルトで折りたたんでいるので、初めて開いた時だけ読み込む(それまでFirestoreに
+// アクセスしない)。以後は「再読み込み」ボタンで明示的に更新する。
+document.getElementById('auction-history-details')?.addEventListener('toggle', function onToggle() {
+  if (this.open && !auctionHistoryLoaded) { auctionHistoryLoaded = true; loadAuctionHistory(); }
+});
 
 async function loadAuctionHistory() {
   if (!auctionHistoryListEl) return;
@@ -449,11 +491,19 @@ function renderAuctionHistory() {
     });
   }
 
+  // 全件取得済みなので、表示だけHISTORY_PAGE_SIZE単位でページ分割する。
+  const totalPages = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
+  auctionHistoryCurrentPage = Math.min(Math.max(1, auctionHistoryCurrentPage), totalPages);
+  const pageStart = (auctionHistoryCurrentPage - 1) * HISTORY_PAGE_SIZE;
+  const pageRows = rows.slice(pageStart, pageStart + HISTORY_PAGE_SIZE);
+
   if (auctionHistoryCountEl) {
     const totalLabel = latestAuctionHistory.length >= AUCTION_HISTORY_FETCH_LIMIT
       ? `直近${AUCTION_HISTORY_FETCH_LIMIT}件中`
       : `${latestAuctionHistory.length}件中`;
-    auctionHistoryCountEl.textContent = `${totalLabel}${rows.length}件を表示`;
+    auctionHistoryCountEl.textContent = rows.length === 0
+      ? `${totalLabel}0件を表示`
+      : `${totalLabel}${rows.length}件が該当（${pageStart + 1}〜${pageStart + pageRows.length}件目を表示、${auctionHistoryCurrentPage}/${totalPages}ページ）`;
   }
 
   if (!auctionHistoryListEl) return;
@@ -493,7 +543,7 @@ function renderAuctionHistory() {
     ? `<span class="admin-user-link" data-omikuji-id="${escapeHtml(omikujiId)}" style="${userLinkStyle}">${escapeHtml(name)}</span>`
     : escapeHtml(name));
 
-  rows.forEach((r) => {
+  pageRows.forEach((r) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${r.item.itemImageUrl ? `<img src="${escapeHtml(r.item.itemImageUrl)}" alt="" data-zoomable="${escapeHtml(r.item.itemImageUrl)}" style="width:36px; height:36px; object-fit:cover; border-radius:4px; display:block;">` : ''}</td>
@@ -520,6 +570,7 @@ function renderAuctionHistory() {
         auctionHistorySortKey = key;
         auctionHistorySortDir = 1;
       }
+      auctionHistoryCurrentPage = 1;
       renderAuctionHistory();
     });
   });
@@ -527,6 +578,12 @@ function renderAuctionHistory() {
   auctionHistoryListEl.innerHTML = '';
   auctionHistoryListEl.appendChild(table);
   enableThumbnailZoom(auctionHistoryListEl);
+
+  const pager = buildPagerControls(auctionHistoryCurrentPage, totalPages, (p) => {
+    auctionHistoryCurrentPage = p;
+    renderAuctionHistory();
+  });
+  if (pager) auctionHistoryListEl.appendChild(pager);
 }
 
 // ===== UP取得履歴（いいね、2026-09-19追加） =====
@@ -545,6 +602,8 @@ const LIKE_UP_DIRECTION_LABELS = { given: 'あげた（アゲ）', received: '�
 let latestLikeDocs = [];
 let likeUpHistorySortKey = 'latestAt';
 let likeUpHistorySortDir = -1; // 1=昇順, -1=降順
+let likeUpHistoryCurrentPage = 1;
+let likeUpHistoryLoaded = false; // <details>を初めて開いた時だけ読み込む(デフォルト折りたたみのため)
 const LIKE_UP_HISTORY_SORT_COLUMNS = {
   userName:  { label: '名前',   get: (r) => r.userName.toLowerCase() },
   direction: { label: '方向',   get: (r) => LIKE_UP_DIRECTION_LABELS[r.direction] },
@@ -555,9 +614,12 @@ const LIKE_UP_HISTORY_SORT_COLUMNS = {
 };
 
 document.getElementById('reload-like-up-history-btn')?.addEventListener('click', loadLikeUpHistory);
-likeUpHistoryFilterEl?.addEventListener('input', renderLikeUpHistory);
-likeUpHistoryFilterGivenEl?.addEventListener('change', renderLikeUpHistory);
-likeUpHistoryFilterReceivedEl?.addEventListener('change', renderLikeUpHistory);
+likeUpHistoryFilterEl?.addEventListener('input', () => { likeUpHistoryCurrentPage = 1; renderLikeUpHistory(); });
+likeUpHistoryFilterGivenEl?.addEventListener('change', () => { likeUpHistoryCurrentPage = 1; renderLikeUpHistory(); });
+likeUpHistoryFilterReceivedEl?.addEventListener('change', () => { likeUpHistoryCurrentPage = 1; renderLikeUpHistory(); });
+document.getElementById('like-up-history-details')?.addEventListener('toggle', function onToggle() {
+  if (this.open && !likeUpHistoryLoaded) { likeUpHistoryLoaded = true; loadLikeUpHistory(); }
+});
 
 async function loadLikeUpHistory() {
   if (!likeUpHistoryListEl) return;
@@ -623,11 +685,19 @@ function renderLikeUpHistory() {
     return 0;
   });
 
+  // 集計後の行を表示だけHISTORY_PAGE_SIZE単位でページ分割する。
+  const totalPages = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
+  likeUpHistoryCurrentPage = Math.min(Math.max(1, likeUpHistoryCurrentPage), totalPages);
+  const pageStart = (likeUpHistoryCurrentPage - 1) * HISTORY_PAGE_SIZE;
+  const pageRows = rows.slice(pageStart, pageStart + HISTORY_PAGE_SIZE);
+
   if (likeUpHistoryCountEl) {
     const totalLabel = latestLikeDocs.length >= LIKE_UP_HISTORY_FETCH_LIMIT
       ? `直近${LIKE_UP_HISTORY_FETCH_LIMIT}件のいいねを`
       : `${latestLikeDocs.length}件のいいねを`;
-    likeUpHistoryCountEl.textContent = `${totalLabel}${grouped.length}行に集計、うち${rows.length}行を表示`;
+    likeUpHistoryCountEl.textContent = rows.length === 0
+      ? `${totalLabel}${grouped.length}行に集計、うち0行を表示`
+      : `${totalLabel}${grouped.length}行に集計、うち${rows.length}行が該当（${pageStart + 1}〜${pageStart + pageRows.length}行目を表示、${likeUpHistoryCurrentPage}/${totalPages}ページ）`;
   }
 
   if (!likeUpHistoryListEl) return;
@@ -650,7 +720,7 @@ function renderLikeUpHistory() {
 
   const nameCellStyle = 'white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis;';
 
-  rows.forEach((r) => {
+  pageRows.forEach((r) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="${nameCellStyle}" title="${escapeHtml(r.userName)}">
@@ -678,12 +748,19 @@ function renderLikeUpHistory() {
         likeUpHistorySortKey = key;
         likeUpHistorySortDir = 1;
       }
+      likeUpHistoryCurrentPage = 1;
       renderLikeUpHistory();
     });
   });
 
   likeUpHistoryListEl.innerHTML = '';
   likeUpHistoryListEl.appendChild(table);
+
+  const pager = buildPagerControls(likeUpHistoryCurrentPage, totalPages, (p) => {
+    likeUpHistoryCurrentPage = p;
+    renderLikeUpHistory();
+  });
+  if (pager) likeUpHistoryListEl.appendChild(pager);
 }
 
 // ===== UP取得履歴（オークション・ミッション、2026-09-19追加） =====
@@ -706,6 +783,8 @@ const upLogTypeFilterEls = Object.fromEntries(
 let latestUpLogDocs = [];
 let upLogHistorySortKey = 'createdAt';
 let upLogHistorySortDir = -1; // 1=昇順, -1=降順
+let upLogHistoryCurrentPage = 1;
+let upLogHistoryLoaded = false; // <details>を初めて開いた時だけ読み込む(デフォルト折りたたみのため)
 const UP_LOG_HISTORY_SORT_COLUMNS = {
   userName:  { label: '名前',   get: (r) => r.userName.toLowerCase() },
   type:      { label: '種類',   get: (r) => UP_LOG_TYPE_LABELS[r.type] || r.type },
@@ -715,8 +794,11 @@ const UP_LOG_HISTORY_SORT_COLUMNS = {
 };
 
 document.getElementById('reload-up-log-history-btn')?.addEventListener('click', loadUpLogHistory);
-upLogHistoryFilterEl?.addEventListener('input', renderUpLogHistory);
-Object.values(upLogTypeFilterEls).forEach((el) => el?.addEventListener('change', renderUpLogHistory));
+upLogHistoryFilterEl?.addEventListener('input', () => { upLogHistoryCurrentPage = 1; renderUpLogHistory(); });
+Object.values(upLogTypeFilterEls).forEach((el) => el?.addEventListener('change', () => { upLogHistoryCurrentPage = 1; renderUpLogHistory(); }));
+document.getElementById('up-log-history-details')?.addEventListener('toggle', function onToggle() {
+  if (this.open && !upLogHistoryLoaded) { upLogHistoryLoaded = true; loadUpLogHistory(); }
+});
 
 async function loadUpLogHistory() {
   if (!upLogHistoryListEl) return;
@@ -769,11 +851,19 @@ function renderUpLogHistory() {
     return 0;
   });
 
+  // 全件取得済みなので、表示だけHISTORY_PAGE_SIZE単位でページ分割する。
+  const totalPages = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
+  upLogHistoryCurrentPage = Math.min(Math.max(1, upLogHistoryCurrentPage), totalPages);
+  const pageStart = (upLogHistoryCurrentPage - 1) * HISTORY_PAGE_SIZE;
+  const pageRows = rows.slice(pageStart, pageStart + HISTORY_PAGE_SIZE);
+
   if (upLogHistoryCountEl) {
     const totalLabel = latestUpLogDocs.length >= UP_LOG_HISTORY_FETCH_LIMIT
       ? `直近${UP_LOG_HISTORY_FETCH_LIMIT}件中`
       : `${latestUpLogDocs.length}件中`;
-    upLogHistoryCountEl.textContent = `${totalLabel}${rows.length}件を表示`;
+    upLogHistoryCountEl.textContent = rows.length === 0
+      ? `${totalLabel}0件を表示`
+      : `${totalLabel}${rows.length}件が該当（${pageStart + 1}〜${pageStart + pageRows.length}件目を表示、${upLogHistoryCurrentPage}/${totalPages}ページ）`;
   }
 
   if (!upLogHistoryListEl) return;
@@ -797,7 +887,7 @@ function renderUpLogHistory() {
   const nameCellStyle = 'white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis;';
   const detailCellStyle = 'white-space:nowrap; max-width:160px; overflow:hidden; text-overflow:ellipsis;';
 
-  rows.forEach((r) => {
+  pageRows.forEach((r) => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td style="${nameCellStyle}" title="${escapeHtml(r.userName)}">
@@ -824,12 +914,19 @@ function renderUpLogHistory() {
         upLogHistorySortKey = key;
         upLogHistorySortDir = 1;
       }
+      upLogHistoryCurrentPage = 1;
       renderUpLogHistory();
     });
   });
 
   upLogHistoryListEl.innerHTML = '';
   upLogHistoryListEl.appendChild(table);
+
+  const pager = buildPagerControls(upLogHistoryCurrentPage, totalPages, (p) => {
+    upLogHistoryCurrentPage = p;
+    renderUpLogHistory();
+  });
+  if (pager) upLogHistoryListEl.appendChild(pager);
 }
 
 // ===== うーこオークション キャンペーン管理(2026-09-18追加) =====

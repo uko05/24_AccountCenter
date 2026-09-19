@@ -115,7 +115,7 @@
   </section>
 
   <section class="section" id="auction-history-section">
-    <details id="auction-history-details" open>
+    <details id="auction-history-details">
       <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">オークション履歴</summary>
       <div style="margin-top:14px;">
         <p class="section-desc">うーこオークションで落札が成立した出品の履歴です（入札で競り落とされた場合・即決購入のどちらも対象。落札されず流札になったものは含みません）。落札日時が新しい順に最大200件表示します。</p>
@@ -137,7 +137,7 @@
   </section>
 
   <section class="section" id="like-up-history-section">
-    <details id="like-up-history-details" open>
+    <details id="like-up-history-details">
       <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">UP取得履歴（いいね）</summary>
       <div style="margin-top:14px;">
         <p class="section-desc">原神おみくじの「いいね」で発生したUPの履歴です。1件ずつだと見づらいため、直近のいいねを人・方向（あげた/もらった）・日付ごとにまとめて表示します。自演いいねの連発やいつもと違う相手からの集中いいねなど、不自然な偏りが無いか確認する用途を想定しています。</p>
@@ -159,7 +159,7 @@
   </section>
 
   <section class="section" id="up-log-history-section">
-    <details id="up-log-history-details" open>
+    <details id="up-log-history-details">
       <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">UP取得履歴（オークション・ミッション）</summary>
       <div style="margin-top:14px;">
         <p class="section-desc">オークションの売上・キャッシュバック・出品ボーナスと、うーこポイント交換所のミッション報酬でUPを得た履歴です（いいねは件数が多いので上の「UP取得履歴（いいね）」に分けています）。直近300件を1件ずつ表示します。</p>
@@ -445,7 +445,9 @@
   <img id="admin-lightbox-img" src="" alt="" style="max-width:90vw; max-height:90vh; border-radius:8px;">
 </div>
 
-<script type="module" src="admin.js?v=16"></script>
+<span id="site-version" class="site-version">v1.1</span>
+
+<script type="module" src="admin.js?v=18"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

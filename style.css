@@ -532,3 +532,13 @@ table.user-table th { background: var(--surface2); }
 .ach-group-count { color: var(--muted); font-weight: normal; font-size: 0.85em; }
 
 .ach-badge-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+
+.site-version {
+  position: fixed;
+  right: 8px;
+  bottom: 6px;
+  font-size: 11px;
+  color: rgba(0,0,0,0.2);
+  pointer-events: none;
+  z-index: 1;
+}
