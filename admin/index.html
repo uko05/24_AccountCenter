@@ -247,10 +247,6 @@
       </div>
 
       <div class="input-group">
-        <label for="campaign-label">名前</label>
-        <input type="text" id="campaign-label" maxlength="40" required>
-      </div>
-      <div class="input-group">
         <label for="campaign-starts">開始日時</label>
         <input type="datetime-local" id="campaign-starts" required>
       </div>
@@ -259,10 +255,6 @@
         <input type="number" id="campaign-days" min="1" step="1" value="7" required>
       </div>
 
-      <div class="input-group">
-        <label for="campaign-banner-url">バナー画像URL（省略可。空なら種類に応じた既定バナーを自動で表示します）</label>
-        <input type="text" id="campaign-banner-url" placeholder="既定バナーで良ければ空欄のままでOK。差し替えたい時だけURLを入力">
-      </div>
       <div class="input-group">
         <label style="display:flex; align-items:center; gap:6px;">
           <input type="checkbox" id="campaign-admin-only"> 管理者ロールのみに表示・適用する（テスト中はこれをON。一般ユーザーには一切見えず、ボーナスも付きません）
@@ -463,9 +455,9 @@
   <img id="admin-lightbox-img" src="" alt="" style="max-width:90vw; max-height:90vh; border-radius:8px;">
 </div>
 
-<span id="site-version" class="site-version">v1.5</span>
+<span id="site-version" class="site-version">v1.6</span>
 
-<script type="module" src="admin.js?v=20"></script>
+<script type="module" src="admin.js?v=21"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

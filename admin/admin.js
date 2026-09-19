@@ -954,17 +954,16 @@ let latestCampaignsAdmin = [];
 
 // 種類はチェックボックス化してあり(複数選択可)、チェックしたものだけその場で
 // 詳細入力欄を出す(1つの<select>で1種類だけ選ぶ方式から2026-09-20に変更)。
-// 併せて、チェックした種類のバナー(バナー画像URLを入力していれば個別指定分、
-// 空ならCAMPAIGN_TYPE_BANNER_URLSの既定分)もその場でプレビュー表示する。
+// 併せて、チェックした種類の既定バナー(CAMPAIGN_TYPE_BANNER_URLS)もその場で
+// プレビュー表示する(バナーURLの個別指定は「変えることがないから」2026-09-20に廃止、
+// 種類ごとの既定バナー固定)。
 function updateCampaignBannerPreviews() {
-  const customUrl = document.getElementById('campaign-banner-url')?.value.trim();
   Object.keys(CAMPAIGN_TYPE_LABELS).forEach((type) => {
     const img = document.getElementById(`campaign-banner-preview-${type}`);
     const cb = document.querySelector(`.campaign-type-checkbox[value="${type}"]`);
     if (!img || !cb) return;
-    const url = cb.checked ? (customUrl || CAMPAIGN_TYPE_BANNER_URLS[type]) : null;
-    if (url) {
-      img.src = url;
+    if (cb.checked && CAMPAIGN_TYPE_BANNER_URLS[type]) {
+      img.src = CAMPAIGN_TYPE_BANNER_URLS[type];
       img.style.display = 'block';
     } else {
       img.style.display = 'none';
@@ -977,7 +976,6 @@ document.querySelectorAll('.campaign-type-checkbox').forEach((cb) => {
     updateCampaignBannerPreviews();
   });
 });
-document.getElementById('campaign-banner-url')?.addEventListener('input', updateCampaignBannerPreviews);
 
 document.getElementById('reload-campaigns-btn')?.addEventListener('click', loadCampaigns);
 
@@ -1020,16 +1018,14 @@ function renderCampaigns() {
     const card = document.createElement('div');
     card.className = 'request-card';
     if (!c.enabled) card.style.opacity = '0.55';
+    const typeLabel = CAMPAIGN_TYPE_LABELS[c.type] || c.type;
     card.innerHTML = `
-      <h4>${escapeHtml(c.label || '')}${active ? '（開催中）' : ''}${c.adminOnly ? '（管理者のみ）' : ''}</h4>
+      <h4>${escapeHtml(typeLabel)}${active ? '（開催中）' : ''}${c.adminOnly ? '（管理者のみ）' : ''}</h4>
       <div style="font-size:0.78rem; color:var(--muted);">
-        ${escapeHtml(CAMPAIGN_TYPE_LABELS[c.type] || c.type)} ／ ${escapeHtml(campaignDetailText(c))}<br>
+        ${escapeHtml(campaignDetailText(c))}<br>
         ${fmtTimestamp(c.startsAt)} 〜 ${fmtTimestamp(c.endsAt)}
       </div>
-      ${(() => {
-        const bannerUrl = c.bannerImageUrl || CAMPAIGN_TYPE_BANNER_URLS[c.type];
-        return bannerUrl ? `<img src="${escapeHtml(bannerUrl)}" alt="" style="max-width:200px; max-height:80px; object-fit:contain; margin-top:6px; border:1px solid var(--border); border-radius:4px;">` : '';
-      })()}
+      ${CAMPAIGN_TYPE_BANNER_URLS[c.type] ? `<img src="${escapeHtml(CAMPAIGN_TYPE_BANNER_URLS[c.type])}" alt="" style="max-width:200px; max-height:80px; object-fit:contain; margin-top:6px; border:1px solid var(--border); border-radius:4px;">` : ''}
       <div class="btn-row">
         <button class="secondary-btn" data-action="toggle">${c.enabled ? '停止する' : '有効化する'}</button>
         <button class="danger-btn" data-action="delete">削除</button>
@@ -1045,7 +1041,7 @@ function renderCampaigns() {
       }
     });
     card.querySelector('[data-action="delete"]').addEventListener('click', async () => {
-      if (!confirm(`キャンペーン「${c.label || ''}」を削除しますか？（元に戻せません）`)) return;
+      if (!confirm(`キャンペーン「${typeLabel}」（${campaignDetailText(c)}、${fmtTimestamp(c.startsAt)}〜${fmtTimestamp(c.endsAt)}）を削除しますか？（元に戻せません）`)) return;
       try {
         await deleteDoc(doc(db, 'ukoAuctionCampaigns', c.id));
         loadCampaigns();
@@ -1068,7 +1064,6 @@ document.getElementById('campaign-create-form').addEventListener('submit', async
   msgEl.classList.remove('ok', 'error');
 
   const checkedTypes = [...document.querySelectorAll('.campaign-type-checkbox:checked')].map((cb) => cb.value);
-  const label = document.getElementById('campaign-label').value.trim();
   const startsRaw = document.getElementById('campaign-starts').value;
   const days = Number(document.getElementById('campaign-days').value);
   const startsAtMs = startsRaw ? new Date(startsRaw).getTime() : NaN;
@@ -1078,23 +1073,21 @@ document.getElementById('campaign-create-form').addEventListener('submit', async
     msgEl.classList.add('error');
     return;
   }
-  if (!label || !Number.isFinite(startsAtMs) || !Number.isFinite(days) || days < 1) {
-    msgEl.textContent = '名前・開始日時・開催日数を入力してください。';
+  if (!Number.isFinite(startsAtMs) || !Number.isFinite(days) || days < 1) {
+    msgEl.textContent = '開始日時・開催日数を入力してください。';
     msgEl.classList.add('error');
     return;
   }
   const endsAtMs = startsAtMs + days * 24 * 60 * 60 * 1000;
 
-  const bannerImageUrl = document.getElementById('campaign-banner-url').value.trim();
   const adminOnly = document.getElementById('campaign-admin-only').checked;
 
   const campaignDataList = [];
   for (const type of checkedTypes) {
     const data = {
-      type, label, enabled: true,
+      type, enabled: true,
       startsAt: Timestamp.fromMillis(startsAtMs),
       endsAt: Timestamp.fromMillis(endsAtMs),
-      bannerImageUrl: bannerImageUrl || null,
       adminOnly,
       createdAt: serverTimestamp(),
     };
