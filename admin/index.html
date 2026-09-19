@@ -245,6 +245,16 @@
         <input type="number" id="campaign-rate" min="1" max="100" step="1" value="10">
       </div>
 
+      <div class="input-group">
+        <label for="campaign-banner-url">バナー画像URL（省略可、うーこオークションのお知らせ枠に表示）</label>
+        <input type="text" id="campaign-banner-url" placeholder="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/01_Genshin/auction/...">
+      </div>
+      <div class="input-group">
+        <label style="display:flex; align-items:center; gap:6px;">
+          <input type="checkbox" id="campaign-admin-only"> 管理者ロールのみに表示・適用する（テスト中はこれをON。一般ユーザーには一切見えず、ボーナスも付きません）
+        </label>
+      </div>
+
       <button type="submit" class="primary-btn" style="width:auto; padding:9px 24px;">作成する</button>
     </form>
     <p id="campaign-create-msg" class="form-msg"></p>

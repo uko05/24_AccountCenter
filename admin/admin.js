@@ -898,11 +898,12 @@ function renderCampaigns() {
     card.className = 'request-card';
     if (!c.enabled) card.style.opacity = '0.55';
     card.innerHTML = `
-      <h4>${escapeHtml(c.label || '')}${active ? '（開催中）' : ''}</h4>
+      <h4>${escapeHtml(c.label || '')}${active ? '（開催中）' : ''}${c.adminOnly ? '（管理者のみ）' : ''}</h4>
       <div style="font-size:0.78rem; color:var(--muted);">
         ${escapeHtml(CAMPAIGN_TYPE_LABELS[c.type] || c.type)} ／ ${escapeHtml(campaignDetailText(c))}<br>
         ${fmtTimestamp(c.startsAt)} 〜 ${fmtTimestamp(c.endsAt)}
       </div>
+      ${c.bannerImageUrl ? `<img src="${escapeHtml(c.bannerImageUrl)}" alt="" style="max-width:200px; max-height:80px; object-fit:contain; margin-top:6px; border:1px solid var(--border); border-radius:4px;">` : ''}
       <div class="btn-row">
         <button class="secondary-btn" data-action="toggle">${c.enabled ? '停止する' : '有効化する'}</button>
         <button class="danger-btn" data-action="delete">削除</button>
@@ -949,10 +950,15 @@ document.getElementById('campaign-create-form').addEventListener('submit', async
   }
   const endsAtMs = startsAtMs + days * 24 * 60 * 60 * 1000;
 
+  const bannerImageUrl = document.getElementById('campaign-banner-url').value.trim();
+  const adminOnly = document.getElementById('campaign-admin-only').checked;
+
   const campaignData = {
     type, label, enabled: true,
     startsAt: Timestamp.fromMillis(startsAtMs),
     endsAt: Timestamp.fromMillis(endsAtMs),
+    bannerImageUrl: bannerImageUrl || null,
+    adminOnly,
     createdAt: serverTimestamp(),
   };
 
