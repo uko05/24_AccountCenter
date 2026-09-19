@@ -714,6 +714,9 @@ const accountsFilterUnregisteredEl = document.getElementById('accounts-filter-un
 const accountsFilterCardBackEl = document.getElementById('accounts-filter-cardback');
 const accountsFilterStorageEl = document.getElementById('accounts-filter-storage');
 const accountsFilterSavedAnyEl = document.getElementById('accounts-filter-savedimage-any');
+const accountsFilterFbRegisteredEl = document.getElementById('accounts-filter-fb-registered');
+const accountsFilterFbMatchedEl = document.getElementById('accounts-filter-fb-matched');
+const accountsFilterFbWantPartnerEl = document.getElementById('accounts-filter-fb-want-partner');
 let allAccounts = [];
 let accountsSortKey = null;
 let accountsSortDir = 1; // 1=昇順, -1=降順
@@ -771,6 +774,11 @@ const ACCOUNTS_SORT_COLUMNS = {
     label: '恋人希望', width: '1%',
     get: (r) => (r.friendBoardWantPartner ? 1 : 0),
     render: (r) => (r.friendBoardWantPartner ? '✅' : ''),
+  },
+  friendBoardGender: {
+    label: 'FB性別', width: '1%',
+    get: (r) => r.friendBoardGender || '',
+    render: (r) => escapeHtml(r.friendBoardGender ? formatFieldValue('gender', r.friendBoardGender, 'ja') : '-'),
   },
 };
 
@@ -873,6 +881,34 @@ function renderFilterSavedSiteToggles() {
 }
 renderFilterSavedSiteToggles();
 
+// フレンド承認板の性別フィルター(未選択=絞り込みなし、savedImageサイトと同じ考え方)。
+// 選択肢のラベルはfields.jsのformatFieldValueをそのまま使い、'male'/'female'という
+// キー自体はfields.js側のOPTION_LABELSを直接importせず、値渡しで文言だけ借りる。
+const FB_GENDER_FILTER_OPTIONS = ['male', 'female'].map((key) => ({ id: key, label: formatFieldValue('gender', key, 'ja') }));
+let accountsFilterFbGenderSet = new Set();
+const filterFbGendersEl = document.getElementById('accounts-filter-fb-genders');
+function renderFilterFbGenderToggles() {
+  filterFbGendersEl.innerHTML = FB_GENDER_FILTER_OPTIONS.map((opt) => `
+    <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;">
+      <input type="checkbox" data-fb-gender-key="${opt.id}" ${accountsFilterFbGenderSet.has(opt.id) ? 'checked' : ''}>
+      ${escapeHtml(opt.label)}（FB）
+    </label>
+  `).join('');
+  filterFbGendersEl.querySelectorAll('input[data-fb-gender-key]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) accountsFilterFbGenderSet.add(cb.dataset.fbGenderKey);
+      else accountsFilterFbGenderSet.delete(cb.dataset.fbGenderKey);
+      accountsCurrentPage = 1;
+      renderAccounts(accountsFilterEl.value);
+    });
+  });
+}
+renderFilterFbGenderToggles();
+
+[accountsFilterFbRegisteredEl, accountsFilterFbMatchedEl, accountsFilterFbWantPartnerEl].forEach((el) => {
+  el.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
+});
+
 document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
 accountsFilterEl.addEventListener('input', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 accountsFilterRegisteredEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
@@ -910,14 +946,16 @@ async function loadAccounts() {
   // だけで「登録あり」列を出せる(詳細な中身は編集画面を開いた時に個別取得する)。
   const hasFriendBoardPostSet = new Set(friendBoardPostsSnap.docs.map((d) => d.id));
 
-  // friendBoardProfiles/{userId}(可視性設定に関係ない生データ)からニックネームと
-  // 「恋人がほしい」希望の有無を拾う。どちらも編集画面の「フレンド承認板」タブと
-  // 同じデータソース(生のfriendPreference配列, wantPartnerキー)。
+  // friendBoardProfiles/{userId}(可視性設定に関係ない生データ)からニックネーム・性別・
+  // 「恋人がほしい」希望の有無を拾う。いずれも編集画面の「フレンド承認板」タブと
+  // 同じデータソース(生のgender/friendPreference配列, wantPartnerキー)。
   const friendBoardNameByOmikujiId = new Map();
+  const friendBoardGenderByOmikujiId = new Map();
   const friendBoardWantPartnerSet = new Set();
   friendBoardProfilesSnap.docs.forEach((d) => {
     const data = d.data() || {};
     if (data.displayName) friendBoardNameByOmikujiId.set(d.id, data.displayName);
+    if (data.gender) friendBoardGenderByOmikujiId.set(d.id, data.gender);
     if (Array.isArray(data.friendPreference) && data.friendPreference.includes('wantPartner')) {
       friendBoardWantPartnerSet.add(d.id);
     }
@@ -975,6 +1013,7 @@ async function loadAccounts() {
         storageImageCount: link?.authUid ? (storageImageCountByAuthUid.get(link.authUid) || 0) : 0,
         hasFriendBoardPost: hasFriendBoardPostSet.has(userDoc.id),
         friendBoardName: friendBoardNameByOmikujiId.get(userDoc.id) || '',
+        friendBoardGender: friendBoardGenderByOmikujiId.get(userDoc.id) || '',
         friendBoardMatchCount: friendBoardMatchCountByOmikujiId.get(userDoc.id) || 0,
         friendBoardWantPartner: friendBoardWantPartnerSet.has(userDoc.id),
       };
@@ -1002,8 +1041,14 @@ function renderAccounts(filterText) {
       });
       if (!hasAnySelectedSite) return false;
     }
+    if (accountsFilterFbRegisteredEl.checked && !a.hasFriendBoardPost) return false;
+    if (accountsFilterFbMatchedEl.checked && !(a.friendBoardMatchCount > 0)) return false;
+    if (accountsFilterFbWantPartnerEl.checked && !a.friendBoardWantPartner) return false;
+    if (accountsFilterFbGenderSet.size > 0 && !accountsFilterFbGenderSet.has(a.friendBoardGender)) return false;
     if (!needle) return true;
-    return a.loginId.toLowerCase().includes(needle) || (a.omikujiData?.name || '').toLowerCase().includes(needle);
+    return a.loginId.toLowerCase().includes(needle)
+      || (a.omikujiData?.name || '').toLowerCase().includes(needle)
+      || (a.friendBoardName || '').toLowerCase().includes(needle);
   });
 
   if (filtered.length === 0) {
@@ -1016,7 +1061,7 @@ function renderAccounts(filterText) {
     a, u: a.omikujiData, counts: countByRarity(a.omikujiData.achievements), hasSavedImages: a.hasSavedImages,
     storageImageCount: a.storageImageCount, hasFriendBoardPost: a.hasFriendBoardPost,
     friendBoardName: a.friendBoardName, friendBoardMatchCount: a.friendBoardMatchCount,
-    friendBoardWantPartner: a.friendBoardWantPartner,
+    friendBoardWantPartner: a.friendBoardWantPartner, friendBoardGender: a.friendBoardGender,
   }));
 
   if (accountsSortKey) {
@@ -1232,6 +1277,8 @@ function defaultEditTabForCurrentFilter() {
   if (accountsFilterSavedAnyEl.checked || accountsFilterSavedSiteSet.size > 0) tab = 'images';
   if (accountsFilterCardBackEl.checked) tab = 'omikuji';
   if (accountsFilterStorageEl.checked) tab = 'storage17';
+  if (accountsFilterFbRegisteredEl.checked || accountsFilterFbMatchedEl.checked
+    || accountsFilterFbWantPartnerEl.checked || accountsFilterFbGenderSet.size > 0) tab = 'friendboard';
   return tab;
 }
 

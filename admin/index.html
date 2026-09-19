@@ -216,7 +216,7 @@
       <label><input type="checkbox" id="accounts-filter-unregistered"> 未登録ユーザー</label>
     </div>
     <div class="input-group">
-      <label for="accounts-filter">絞り込み（登録ID・名前）</label>
+      <label for="accounts-filter">絞り込み（登録ID・名前・FB名前）</label>
       <input type="text" id="accounts-filter" placeholder="入力するとリアルタイムで絞り込みます">
     </div>
     <details style="margin-bottom:10px;">
@@ -230,7 +230,14 @@
           <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-savedimage-any"> 画像保存(いずれか)ありのみ</label>
         </div>
         <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">画像メーカー系(個別・複数選択でいずれか一致)</p>
-        <div id="accounts-filter-savedimage-sites" style="display:flex; flex-wrap:wrap; gap:8px 14px;"></div>
+        <div id="accounts-filter-savedimage-sites" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;"></div>
+        <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">フレンド承認板</p>
+        <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;">
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-registered"> 登録ありのみ</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-matched"> マッチングありのみ</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-want-partner"> 恋人希望のみ</label>
+        </div>
+        <div id="accounts-filter-fb-genders" style="display:flex; flex-wrap:wrap; gap:8px 14px;"></div>
       </div>
     </details>
     <details style="margin-bottom:10px;">
