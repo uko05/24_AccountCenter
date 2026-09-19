@@ -758,6 +758,20 @@ const ACCOUNTS_SORT_COLUMNS = {
     get: (r) => (r.hasFriendBoardPost ? 1 : 0),
     render: (r) => (r.hasFriendBoardPost ? '✅' : ''),
   },
+  friendBoardName: {
+    label: 'FB名前', width: '14%',
+    get: (r) => r.friendBoardName || '',
+    render: (r) => escapeHtml(r.friendBoardName || '-'),
+  },
+  friendBoardMatchCount: {
+    label: 'マッチング数', width: '1%',
+    get: (r) => r.friendBoardMatchCount || 0,
+  },
+  friendBoardWantPartner: {
+    label: '恋人希望', width: '1%',
+    get: (r) => (r.friendBoardWantPartner ? 1 : 0),
+    render: (r) => (r.friendBoardWantPartner ? '✅' : ''),
+  },
 };
 
 // 表示する列の選択状態(この管理画面を開いているブラウザだけのローカル設定)。
@@ -871,13 +885,15 @@ async function loadAccounts() {
   accountsListEl.innerHTML = '読み込み中…';
   accountsCurrentPage = 1;
 
-  const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap, friendBoardPostsSnap] = await Promise.all([
+  const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap, friendBoardPostsSnap, friendBoardProfilesSnap, friendBoardApplicationsSnap] = await Promise.all([
     getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'))),
     getDocs(collection(db, 'accountLinks')),
     getDocs(collection(db, 'sharedUserRoles')),
     getDocs(collection(db, 'savedProfileImages')),
     getDocs(collection(db, 'screenshotStorageImages')),
     getDocs(collection(db, 'friendBoardPosts')),
+    getDocs(collection(db, 'friendBoardProfiles')),
+    getDocs(collection(db, 'friendBoardApplications')),
   ]);
 
   const linkByOmikujiId = new Map();
@@ -893,6 +909,31 @@ async function loadAccounts() {
   // 共有匿名ID(genshinOmikuji_userId)をドキュメントIDにしているので、そのまま存在確認
   // だけで「登録あり」列を出せる(詳細な中身は編集画面を開いた時に個別取得する)。
   const hasFriendBoardPostSet = new Set(friendBoardPostsSnap.docs.map((d) => d.id));
+
+  // friendBoardProfiles/{userId}(可視性設定に関係ない生データ)からニックネームと
+  // 「恋人がほしい」希望の有無を拾う。どちらも編集画面の「フレンド承認板」タブと
+  // 同じデータソース(生のfriendPreference配列, wantPartnerキー)。
+  const friendBoardNameByOmikujiId = new Map();
+  const friendBoardWantPartnerSet = new Set();
+  friendBoardProfilesSnap.docs.forEach((d) => {
+    const data = d.data() || {};
+    if (data.displayName) friendBoardNameByOmikujiId.set(d.id, data.displayName);
+    if (Array.isArray(data.friendPreference) && data.friendPreference.includes('wantPartner')) {
+      friendBoardWantPartnerSet.add(d.id);
+    }
+  });
+
+  // マッチング数 = 承認済み(accepted)の申請に、出品者・申請者どちらかとして関わった件数
+  // (25_FriendBoardの「やり取り」タブに出てくる相手の数と同じ数え方)。
+  const friendBoardMatchCountByOmikujiId = new Map();
+  friendBoardApplicationsSnap.docs.forEach((d) => {
+    const app = d.data() || {};
+    if (app.status !== 'accepted') return;
+    [app.postOwnerUserId, app.applicantUserId].forEach((uid) => {
+      if (!uid) return;
+      friendBoardMatchCountByOmikujiId.set(uid, (friendBoardMatchCountByOmikujiId.get(uid) || 0) + 1);
+    });
+  });
 
   // savedProfileImages/{omikujiUserId}は{ [siteId]: {url, updatedAt} }なので、
   // 一覧の列自体は「1つでも画像メーカー系サイトに保存しているか」だけ見せる
@@ -933,6 +974,9 @@ async function loadAccounts() {
         savedImageSiteIds: savedImageSitesByOmikujiId.get(userDoc.id) || new Set(),
         storageImageCount: link?.authUid ? (storageImageCountByAuthUid.get(link.authUid) || 0) : 0,
         hasFriendBoardPost: hasFriendBoardPostSet.has(userDoc.id),
+        friendBoardName: friendBoardNameByOmikujiId.get(userDoc.id) || '',
+        friendBoardMatchCount: friendBoardMatchCountByOmikujiId.get(userDoc.id) || 0,
+        friendBoardWantPartner: friendBoardWantPartnerSet.has(userDoc.id),
       };
     });
 
@@ -971,6 +1015,8 @@ function renderAccounts(filterText) {
   let rows = filtered.map((a) => ({
     a, u: a.omikujiData, counts: countByRarity(a.omikujiData.achievements), hasSavedImages: a.hasSavedImages,
     storageImageCount: a.storageImageCount, hasFriendBoardPost: a.hasFriendBoardPost,
+    friendBoardName: a.friendBoardName, friendBoardMatchCount: a.friendBoardMatchCount,
+    friendBoardWantPartner: a.friendBoardWantPartner,
   }));
 
   if (accountsSortKey) {
