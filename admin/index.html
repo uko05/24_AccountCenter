@@ -136,6 +136,28 @@
     </details>
   </section>
 
+  <section class="section" id="like-up-history-section">
+    <details id="like-up-history-details" open>
+      <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">UP取得履歴（いいね）</summary>
+      <div style="margin-top:14px;">
+        <p class="section-desc">原神おみくじの「いいね」で発生したUPの履歴です。1件ずつだと見づらいため、直近のいいねを人・方向（あげた/もらった）・日付ごとにまとめて表示します。自演いいねの連発やいつもと違う相手からの集中いいねなど、不自然な偏りが無いか確認する用途を想定しています。</p>
+        <button id="reload-like-up-history-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+        <div class="input-group">
+          <label for="like-up-history-filter">絞り込み（名前）</label>
+          <input type="text" id="like-up-history-filter" placeholder="入力するとリアルタイムで絞り込みます">
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin:8px 0 10px;">
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="like-up-history-filter-given" checked> あげた（アゲいいね）</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="like-up-history-filter-received" checked> もらった（モラいいね）</label>
+        </div>
+        <div id="like-up-history-count" class="section-desc" style="margin:0 0 6px;"></div>
+        <div style="overflow-x:auto;">
+          <div id="like-up-history-list"></div>
+        </div>
+      </div>
+    </details>
+  </section>
+
   <section class="section" id="campaign-management-section">
     <div class="section-title">うーこオークション キャンペーン管理</div>
     <p class="section-desc">期間限定で出品・落札にボーナスUPが付くキャンペーンを作成・管理します。複数のキャンペーンを同時に開催できます。26_UkoAuction・14_GenshinOmikujiが自動的に反映します。</p>

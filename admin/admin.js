@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp,
+  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, collectionGroup, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // 一覧は件数無制限で全件取得し、表示だけこの件数単位でページ分割する
@@ -91,6 +91,7 @@ onAuthStateChanged(auth, async (user) => {
     loadRequests();
     loadAccounts();
     loadAuctionHistory();
+    loadLikeUpHistory();
     loadCampaigns();
   }
 });
@@ -525,6 +526,163 @@ function renderAuctionHistory() {
   auctionHistoryListEl.innerHTML = '';
   auctionHistoryListEl.appendChild(table);
   enableThumbnailZoom(auctionHistoryListEl);
+}
+
+// ===== UP取得履歴（いいね、2026-09-19追加） =====
+// omikujiFeed/{feedId}/likes/{likerUserId}をcollectionGroupで横断取得する。1件=1いいねの
+// 生ログのままだと量が多く見づらいので、「誰が・どちら方向(あげた/もらった)で・何日に」
+// 何件、合計何UP動いたかにまとめてから表示する(自演いいね連発やいつもと違う相手からの
+// 集中いいねのような不自然な偏りを見つけやすくする狙い。買い切り即決の自演発覚と同じ
+// 動機、[[project_uko_auction]]参照)。
+const LIKE_UP_HISTORY_FETCH_LIMIT = 500;
+const likeUpHistoryListEl = document.getElementById('like-up-history-list');
+const likeUpHistoryCountEl = document.getElementById('like-up-history-count');
+const likeUpHistoryFilterEl = document.getElementById('like-up-history-filter');
+const likeUpHistoryFilterGivenEl = document.getElementById('like-up-history-filter-given');
+const likeUpHistoryFilterReceivedEl = document.getElementById('like-up-history-filter-received');
+const LIKE_UP_DIRECTION_LABELS = { given: 'あげた（アゲ）', received: 'もらった（モラ）' };
+let latestLikeDocs = [];
+let likeUpHistorySortKey = 'latestAt';
+let likeUpHistorySortDir = -1; // 1=昇順, -1=降順
+const LIKE_UP_HISTORY_SORT_COLUMNS = {
+  userName:  { label: '名前',   get: (r) => r.userName.toLowerCase() },
+  direction: { label: '方向',   get: (r) => LIKE_UP_DIRECTION_LABELS[r.direction] },
+  count:     { label: '件数',   get: (r) => r.count },
+  totalUp:   { label: '合計UP', get: (r) => r.totalUp },
+  day:       { label: '日付',   get: (r) => r.day },
+  latestAt:  { label: '最新',   get: (r) => r.latestAtMs },
+};
+
+document.getElementById('reload-like-up-history-btn')?.addEventListener('click', loadLikeUpHistory);
+likeUpHistoryFilterEl?.addEventListener('input', renderLikeUpHistory);
+likeUpHistoryFilterGivenEl?.addEventListener('change', renderLikeUpHistory);
+likeUpHistoryFilterReceivedEl?.addEventListener('change', renderLikeUpHistory);
+
+async function loadLikeUpHistory() {
+  if (!likeUpHistoryListEl) return;
+  likeUpHistoryListEl.innerHTML = '読み込み中…';
+  try {
+    const snap = await getDocs(query(
+      collectionGroup(db, 'likes'),
+      orderBy('likedAt', 'desc'),
+      limit(LIKE_UP_HISTORY_FETCH_LIMIT),
+    ));
+    latestLikeDocs = snap.docs.map((d) => d.data());
+    renderLikeUpHistory();
+  } catch (e) {
+    console.error('[admin] like history load failed', e);
+    likeUpHistoryListEl.innerHTML = '読み込みに失敗しました。';
+  }
+}
+
+// ローカル日付(YYYY-MM-DD)・ユーザー・方向ごとに集計する。giveAmount/receiveAmountは
+// 2026-09-19の時限ブースト機能追加時に付けたフィールドなので、それより前のいいねには
+// 無い(その場合は基準値の1/2とみなす)。receiverUserIdも同時期の追加なので、それより前の
+// いいねはreceiver側の集計に出てこない(集計不能。件数として無視する)。
+function aggregateLikeUpHistory() {
+  const groups = new Map();
+  latestLikeDocs.forEach((d) => {
+    const likedAtMs = d.likedAt?.toMillis?.() || 0;
+    if (!likedAtMs) return;
+    const dayStr = new Date(likedAtMs).toLocaleDateString('sv-SE'); // YYYY-MM-DD
+    [
+      { userId: d.likerUserId, direction: 'given', amount: d.giveAmount ?? 1 },
+      { userId: d.receiverUserId, direction: 'received', amount: d.receiveAmount ?? 2 },
+    ].forEach(({ userId, direction, amount }) => {
+      if (!userId) return;
+      const key = `${userId}_${direction}_${dayStr}`;
+      const g = groups.get(key) || { userId, direction, day: dayStr, count: 0, totalUp: 0, latestAtMs: 0 };
+      g.count += 1;
+      g.totalUp += amount;
+      g.latestAtMs = Math.max(g.latestAtMs, likedAtMs);
+      groups.set(key, g);
+    });
+  });
+  return [...groups.values()];
+}
+
+function renderLikeUpHistory() {
+  const keyword = (likeUpHistoryFilterEl?.value || '').trim().toLowerCase();
+  const showGiven = likeUpHistoryFilterGivenEl ? likeUpHistoryFilterGivenEl.checked : true;
+  const showReceived = likeUpHistoryFilterReceivedEl ? likeUpHistoryFilterReceivedEl.checked : true;
+
+  const grouped = aggregateLikeUpHistory();
+  let rows = grouped.map((g) => ({ ...g, userName: lookupOmikujiName(g.userId) })).filter((r) => {
+    if (r.direction === 'given' && !showGiven) return false;
+    if (r.direction === 'received' && !showReceived) return false;
+    if (!keyword) return true;
+    return r.userName.toLowerCase().includes(keyword);
+  });
+
+  const getter = LIKE_UP_HISTORY_SORT_COLUMNS[likeUpHistorySortKey].get;
+  rows = rows.slice().sort((x, y) => {
+    const vx = getter(x), vy = getter(y);
+    if (vx < vy) return -1 * likeUpHistorySortDir;
+    if (vx > vy) return 1 * likeUpHistorySortDir;
+    return 0;
+  });
+
+  if (likeUpHistoryCountEl) {
+    const totalLabel = latestLikeDocs.length >= LIKE_UP_HISTORY_FETCH_LIMIT
+      ? `直近${LIKE_UP_HISTORY_FETCH_LIMIT}件のいいねを`
+      : `${latestLikeDocs.length}件のいいねを`;
+    likeUpHistoryCountEl.textContent = `${totalLabel}${grouped.length}行に集計、うち${rows.length}行を表示`;
+  }
+
+  if (!likeUpHistoryListEl) return;
+  if (rows.length === 0) {
+    likeUpHistoryListEl.innerHTML = latestLikeDocs.length === 0
+      ? 'いいねの履歴はまだありません。'
+      : '条件に一致する履歴がありません。';
+    return;
+  }
+
+  const sortArrow = (key) => (likeUpHistorySortKey === key ? (likeUpHistorySortDir === 1 ? ' ▲' : ' ▼') : '');
+  const headerCells = Object.entries(LIKE_UP_HISTORY_SORT_COLUMNS).map(([key, col]) => `
+    <th data-sort-key="${key}" style="white-space:nowrap; cursor:pointer; user-select:none;">${col.label}${sortArrow(key)}</th>
+  `).join('');
+
+  const table = document.createElement('table');
+  table.className = 'user-table';
+  table.innerHTML = `<thead><tr>${headerCells}</tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+
+  const nameCellStyle = 'white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis;';
+
+  rows.forEach((r) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="${nameCellStyle}" title="${escapeHtml(r.userName)}">
+        <span class="admin-user-link" data-omikuji-id="${escapeHtml(r.userId)}" style="cursor:pointer; color:#2a6fdb; text-decoration:underline;">${escapeHtml(r.userName)}</span>
+      </td>
+      <td style="white-space:nowrap;">${escapeHtml(LIKE_UP_DIRECTION_LABELS[r.direction] || r.direction)}</td>
+      <td style="white-space:nowrap;">${r.count}件</td>
+      <td style="white-space:nowrap;">${r.totalUp}UP</td>
+      <td style="white-space:nowrap;">${escapeHtml(r.day)}</td>
+      <td style="white-space:nowrap;">${escapeHtml(fmtTimestamp(r.latestAtMs))}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  table.querySelectorAll('[data-omikuji-id]').forEach((el) => {
+    el.addEventListener('click', () => openEditorByOmikujiId(el.dataset.omikujiId));
+  });
+
+  table.querySelectorAll('th[data-sort-key]').forEach((th) => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sortKey;
+      if (likeUpHistorySortKey === key) {
+        likeUpHistorySortDir *= -1;
+      } else {
+        likeUpHistorySortKey = key;
+        likeUpHistorySortDir = 1;
+      }
+      renderLikeUpHistory();
+    });
+  });
+
+  likeUpHistoryListEl.innerHTML = '';
+  likeUpHistoryListEl.appendChild(table);
 }
 
 // ===== うーこオークション キャンペーン管理(2026-09-18追加) =====
