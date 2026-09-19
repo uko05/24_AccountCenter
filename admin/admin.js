@@ -92,6 +92,7 @@ onAuthStateChanged(auth, async (user) => {
     loadAccounts();
     loadAuctionHistory();
     loadLikeUpHistory();
+    loadUpLogHistory();
     loadCampaigns();
   }
 });
@@ -683,6 +684,152 @@ function renderLikeUpHistory() {
 
   likeUpHistoryListEl.innerHTML = '';
   likeUpHistoryListEl.appendChild(table);
+}
+
+// ===== UP取得履歴（オークション・ミッション、2026-09-19追加） =====
+// ukoPointsLog(26_UkoAuction/14_GenshinOmikuji/08_UPointがukoPointsを増やす
+// トランザクションと同時に書き込む監査ログ)をそのまま一覧表示する。いいねと違って
+// 件数がそこまで多くないので、集計せず1件=1行のまま出す(UP取得履歴（いいね）とは対照的)。
+const UP_LOG_HISTORY_FETCH_LIMIT = 300;
+const upLogHistoryListEl = document.getElementById('up-log-history-list');
+const upLogHistoryCountEl = document.getElementById('up-log-history-count');
+const upLogHistoryFilterEl = document.getElementById('up-log-history-filter');
+const UP_LOG_TYPE_LABELS = {
+  auctionSale: 'オークション売上',
+  auctionCashback: '落札キャッシュバック',
+  auctionListingBonus: '出品ボーナス',
+  missionClaim: 'ミッション報酬',
+};
+const upLogTypeFilterEls = Object.fromEntries(
+  Object.keys(UP_LOG_TYPE_LABELS).map((type) => [type, document.getElementById(`up-log-history-filter-${type}`)])
+);
+let latestUpLogDocs = [];
+let upLogHistorySortKey = 'createdAt';
+let upLogHistorySortDir = -1; // 1=昇順, -1=降順
+const UP_LOG_HISTORY_SORT_COLUMNS = {
+  userName:  { label: '名前',   get: (r) => r.userName.toLowerCase() },
+  type:      { label: '種類',   get: (r) => UP_LOG_TYPE_LABELS[r.type] || r.type },
+  amount:    { label: '金額',   get: (r) => r.amount },
+  detail:    { label: '詳細',   get: (r) => r.detail },
+  createdAt: { label: '日時',   get: (r) => r.createdAtMs },
+};
+
+document.getElementById('reload-up-log-history-btn')?.addEventListener('click', loadUpLogHistory);
+upLogHistoryFilterEl?.addEventListener('input', renderUpLogHistory);
+Object.values(upLogTypeFilterEls).forEach((el) => el?.addEventListener('change', renderUpLogHistory));
+
+async function loadUpLogHistory() {
+  if (!upLogHistoryListEl) return;
+  upLogHistoryListEl.innerHTML = '読み込み中…';
+  try {
+    const snap = await getDocs(query(
+      collection(db, 'ukoPointsLog'),
+      orderBy('createdAt', 'desc'),
+      limit(UP_LOG_HISTORY_FETCH_LIMIT),
+    ));
+    latestUpLogDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    renderUpLogHistory();
+  } catch (e) {
+    console.error('[admin] up log history load failed', e);
+    upLogHistoryListEl.innerHTML = '読み込みに失敗しました。';
+  }
+}
+
+// meta(種類ごとに形が違う)から表示用の一言を作る。オークション系はアイテム名、
+// ミッションは達成キー(mission.claimKeyそのまま。MISSION_GROUPSをこの画面に
+// importしていないため文言化はせず、キー名をそのまま出す)。
+function upLogDetailText(d) {
+  const meta = d.meta || {};
+  if (d.type === 'missionClaim') return meta.claimKey || '';
+  return meta.itemName || meta.itemId || '';
+}
+
+function renderUpLogHistory() {
+  const keyword = (upLogHistoryFilterEl?.value || '').trim().toLowerCase();
+
+  let rows = latestUpLogDocs.map((d) => ({
+    userId: d.userId,
+    userName: lookupOmikujiName(d.userId),
+    type: d.type,
+    amount: d.amount || 0,
+    detail: upLogDetailText(d),
+    createdAtMs: d.createdAt?.toMillis?.() ?? 0,
+  })).filter((r) => {
+    const typeEl = upLogTypeFilterEls[r.type];
+    if (typeEl && !typeEl.checked) return false;
+    if (!keyword) return true;
+    return r.userName.toLowerCase().includes(keyword);
+  });
+
+  const getter = UP_LOG_HISTORY_SORT_COLUMNS[upLogHistorySortKey].get;
+  rows = rows.slice().sort((x, y) => {
+    const vx = getter(x), vy = getter(y);
+    if (vx < vy) return -1 * upLogHistorySortDir;
+    if (vx > vy) return 1 * upLogHistorySortDir;
+    return 0;
+  });
+
+  if (upLogHistoryCountEl) {
+    const totalLabel = latestUpLogDocs.length >= UP_LOG_HISTORY_FETCH_LIMIT
+      ? `直近${UP_LOG_HISTORY_FETCH_LIMIT}件中`
+      : `${latestUpLogDocs.length}件中`;
+    upLogHistoryCountEl.textContent = `${totalLabel}${rows.length}件を表示`;
+  }
+
+  if (!upLogHistoryListEl) return;
+  if (rows.length === 0) {
+    upLogHistoryListEl.innerHTML = latestUpLogDocs.length === 0
+      ? 'UP取得履歴はまだありません。'
+      : '条件に一致する履歴がありません。';
+    return;
+  }
+
+  const sortArrow = (key) => (upLogHistorySortKey === key ? (upLogHistorySortDir === 1 ? ' ▲' : ' ▼') : '');
+  const headerCells = Object.entries(UP_LOG_HISTORY_SORT_COLUMNS).map(([key, col]) => `
+    <th data-sort-key="${key}" style="white-space:nowrap; cursor:pointer; user-select:none;">${col.label}${sortArrow(key)}</th>
+  `).join('');
+
+  const table = document.createElement('table');
+  table.className = 'user-table';
+  table.innerHTML = `<thead><tr>${headerCells}</tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+
+  const nameCellStyle = 'white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis;';
+  const detailCellStyle = 'white-space:nowrap; max-width:160px; overflow:hidden; text-overflow:ellipsis;';
+
+  rows.forEach((r) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="${nameCellStyle}" title="${escapeHtml(r.userName)}">
+        <span class="admin-user-link" data-omikuji-id="${escapeHtml(r.userId)}" style="cursor:pointer; color:#2a6fdb; text-decoration:underline;">${escapeHtml(r.userName)}</span>
+      </td>
+      <td style="white-space:nowrap;">${escapeHtml(UP_LOG_TYPE_LABELS[r.type] || r.type)}</td>
+      <td style="white-space:nowrap;">${r.amount}UP</td>
+      <td style="${detailCellStyle}" title="${escapeHtml(r.detail)}">${escapeHtml(r.detail)}</td>
+      <td style="white-space:nowrap;">${escapeHtml(fmtTimestamp(r.createdAtMs))}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  table.querySelectorAll('[data-omikuji-id]').forEach((el) => {
+    el.addEventListener('click', () => openEditorByOmikujiId(el.dataset.omikujiId));
+  });
+
+  table.querySelectorAll('th[data-sort-key]').forEach((th) => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sortKey;
+      if (upLogHistorySortKey === key) {
+        upLogHistorySortDir *= -1;
+      } else {
+        upLogHistorySortKey = key;
+        upLogHistorySortDir = 1;
+      }
+      renderUpLogHistory();
+    });
+  });
+
+  upLogHistoryListEl.innerHTML = '';
+  upLogHistoryListEl.appendChild(table);
 }
 
 // ===== うーこオークション キャンペーン管理(2026-09-18追加) =====

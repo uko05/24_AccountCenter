@@ -158,6 +158,30 @@
     </details>
   </section>
 
+  <section class="section" id="up-log-history-section">
+    <details id="up-log-history-details" open>
+      <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">UP取得履歴（オークション・ミッション）</summary>
+      <div style="margin-top:14px;">
+        <p class="section-desc">オークションの売上・キャッシュバック・出品ボーナスと、うーこポイント交換所のミッション報酬でUPを得た履歴です（いいねは件数が多いので上の「UP取得履歴（いいね）」に分けています）。直近300件を1件ずつ表示します。</p>
+        <button id="reload-up-log-history-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+        <div class="input-group">
+          <label for="up-log-history-filter">絞り込み（名前）</label>
+          <input type="text" id="up-log-history-filter" placeholder="入力するとリアルタイムで絞り込みます">
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin:8px 0 10px;">
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="up-log-history-filter-auctionSale" checked> オークション売上</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="up-log-history-filter-auctionCashback" checked> 落札キャッシュバック</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="up-log-history-filter-auctionListingBonus" checked> 出品ボーナス</label>
+          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="up-log-history-filter-missionClaim" checked> ミッション報酬</label>
+        </div>
+        <div id="up-log-history-count" class="section-desc" style="margin:0 0 6px;"></div>
+        <div style="overflow-x:auto;">
+          <div id="up-log-history-list"></div>
+        </div>
+      </div>
+    </details>
+  </section>
+
   <section class="section" id="campaign-management-section">
     <div class="section-title">うーこオークション キャンペーン管理</div>
     <p class="section-desc">期間限定で出品・落札にボーナスUPが付くキャンペーンを作成・管理します。複数のキャンペーンを同時に開催できます。26_UkoAuction・14_GenshinOmikujiが自動的に反映します。</p>

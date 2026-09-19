@@ -154,6 +154,20 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // UP取得履歴の監査ログ(2026-09-19追加、管理者画面「UP取得履歴」用)。オークション
+    // (26_UkoAuction)・ミッション報酬(08_UPoint)などukoPointsを増やす箇所が、増やすのと
+    // 同じトランザクションでここにも1件書き込む(誰が・何で・いつ・いくら得たか)。
+    // omikujiUsers自体が全開放(allow read, write: if true)なので、このログも改ざんを
+    // 完全には防げない(ここだけ書き込みを絞っても、omikujiUsersを直接叩けば回避できる)。
+    // あくまで通常操作の記録用途で、不正調査の補助(このログとomikujiUsers.ukoPointsの
+    // 整合性が取れていない=何か直接いじられた、という手がかりにはなる)。書き換え・削除は
+    // 想定しないため不可、作成のみ誰でも可(likesサブコレクション等と同じ匿名運用方針)。
+    match /ukoPointsLog/{logId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
     // AccountCenter 機種変申請（未登録ユーザーでも送信できるよう作成は誰でも可。
     // 閲覧・処理(更新)・却下(更新)・削除は管理者のみ）
     match /mergeRequests/{requestId} {
