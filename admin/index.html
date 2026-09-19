@@ -188,14 +188,60 @@
 
     <form id="campaign-create-form">
       <div class="input-group">
-        <label for="campaign-type">種類</label>
-        <select id="campaign-type">
-          <option value="sellerBonus">出品者ボーナス(落札額×倍率)</option>
-          <option value="listingBonus">出品即時ボーナス(定額)</option>
-          <option value="listingCountBonus">出品数ボーナス(段階制)</option>
-          <option value="bidderBonus">落札者キャッシュバック(落札額の%還元)</option>
-        </select>
+        <label>種類（複数選択可。チェックした種類ごとに1件ずつキャンペーンを作成します）</label>
+
+        <label style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+          <input type="checkbox" class="campaign-type-checkbox" value="sellerBonus"> 出品者ボーナス(落札額×倍率)
+        </label>
+        <div class="input-group hidden" id="campaign-field-sellerBonus" style="margin-left:22px;">
+          <label for="campaign-multiplier">倍率（例: 1.5）</label>
+          <input type="number" id="campaign-multiplier" min="1" step="0.1" value="1.5">
+        </div>
+
+        <label style="display:flex; align-items:center; gap:6px; margin-top:10px;">
+          <input type="checkbox" class="campaign-type-checkbox" value="listingBonus"> 出品即時ボーナス(定額)
+        </label>
+        <div class="input-group hidden" id="campaign-field-listingBonus" style="margin-left:22px;">
+          <label for="campaign-bonusAmount">出品時にもらえるUP</label>
+          <input type="number" id="campaign-bonusAmount" min="1" step="1" value="10">
+        </div>
+
+        <label style="display:flex; align-items:center; gap:6px; margin-top:10px;">
+          <input type="checkbox" class="campaign-type-checkbox" value="listingCountBonus"> 出品数ボーナス(段階制)
+        </label>
+        <div class="input-group hidden" id="campaign-field-listingCountBonus" style="margin-left:22px;">
+          <label>段階設定（出品数としてもらえるUP）</label>
+          <div class="radio-row" style="align-items:center;">
+            <input type="number" id="campaign-tier-count-1" min="1" step="1" placeholder="3" style="width:64px;">件 →
+            <input type="number" id="campaign-tier-bonus-1" min="1" step="1" placeholder="30" style="width:64px;">UP
+          </div>
+          <div class="radio-row" style="align-items:center;">
+            <input type="number" id="campaign-tier-count-2" min="1" step="1" placeholder="5" style="width:64px;">件 →
+            <input type="number" id="campaign-tier-bonus-2" min="1" step="1" placeholder="60" style="width:64px;">UP
+          </div>
+          <div class="radio-row" style="align-items:center;">
+            <input type="number" id="campaign-tier-count-3" min="1" step="1" placeholder="10" style="width:64px;">件 →
+            <input type="number" id="campaign-tier-bonus-3" min="1" step="1" placeholder="150" style="width:64px;">UP
+          </div>
+          <div class="radio-row" style="align-items:center;">
+            <input type="number" id="campaign-tier-count-4" min="1" step="1" style="width:64px;">件 →
+            <input type="number" id="campaign-tier-bonus-4" min="1" step="1" style="width:64px;">UP
+          </div>
+          <div class="radio-row" style="align-items:center;">
+            <input type="number" id="campaign-tier-count-5" min="1" step="1" style="width:64px;">件 →
+            <input type="number" id="campaign-tier-bonus-5" min="1" step="1" style="width:64px;">UP
+          </div>
+        </div>
+
+        <label style="display:flex; align-items:center; gap:6px; margin-top:10px;">
+          <input type="checkbox" class="campaign-type-checkbox" value="bidderBonus"> 落札者キャッシュバック(落札額の%還元)
+        </label>
+        <div class="input-group hidden" id="campaign-field-bidderBonus" style="margin-left:22px;">
+          <label for="campaign-rate">還元率（%、例: 10）</label>
+          <input type="number" id="campaign-rate" min="1" max="100" step="1" value="10">
+        </div>
       </div>
+
       <div class="input-group">
         <label for="campaign-label">名前（管理用メモ）</label>
         <input type="text" id="campaign-label" maxlength="40" required>
@@ -207,42 +253,6 @@
       <div class="input-group">
         <label for="campaign-days">開催日数</label>
         <input type="number" id="campaign-days" min="1" step="1" value="7" required>
-      </div>
-
-      <div class="input-group" id="campaign-field-sellerBonus">
-        <label for="campaign-multiplier">倍率（例: 1.5）</label>
-        <input type="number" id="campaign-multiplier" min="1" step="0.1" value="1.5">
-      </div>
-      <div class="input-group hidden" id="campaign-field-listingBonus">
-        <label for="campaign-bonusAmount">出品時にもらえるUP</label>
-        <input type="number" id="campaign-bonusAmount" min="1" step="1" value="10">
-      </div>
-      <div class="input-group hidden" id="campaign-field-listingCountBonus">
-        <label>段階設定（出品数としてもらえるUP）</label>
-        <div class="radio-row" style="align-items:center;">
-          <input type="number" id="campaign-tier-count-1" min="1" step="1" placeholder="3" style="width:64px;">件 →
-          <input type="number" id="campaign-tier-bonus-1" min="1" step="1" placeholder="30" style="width:64px;">UP
-        </div>
-        <div class="radio-row" style="align-items:center;">
-          <input type="number" id="campaign-tier-count-2" min="1" step="1" placeholder="5" style="width:64px;">件 →
-          <input type="number" id="campaign-tier-bonus-2" min="1" step="1" placeholder="60" style="width:64px;">UP
-        </div>
-        <div class="radio-row" style="align-items:center;">
-          <input type="number" id="campaign-tier-count-3" min="1" step="1" placeholder="10" style="width:64px;">件 →
-          <input type="number" id="campaign-tier-bonus-3" min="1" step="1" placeholder="150" style="width:64px;">UP
-        </div>
-        <div class="radio-row" style="align-items:center;">
-          <input type="number" id="campaign-tier-count-4" min="1" step="1" style="width:64px;">件 →
-          <input type="number" id="campaign-tier-bonus-4" min="1" step="1" style="width:64px;">UP
-        </div>
-        <div class="radio-row" style="align-items:center;">
-          <input type="number" id="campaign-tier-count-5" min="1" step="1" style="width:64px;">件 →
-          <input type="number" id="campaign-tier-bonus-5" min="1" step="1" style="width:64px;">UP
-        </div>
-      </div>
-      <div class="input-group hidden" id="campaign-field-bidderBonus">
-        <label for="campaign-rate">還元率（%、例: 10）</label>
-        <input type="number" id="campaign-rate" min="1" max="100" step="1" value="10">
       </div>
 
       <div class="input-group">
@@ -264,46 +274,50 @@
   </section>
 
   <section class="section" id="accounts-section">
-    <div class="section-title">ユーザー一覧</div>
-    <p class="section-desc">omikujiUsers全体から、1度もおみくじを引いたことがない人を除き、最終更新日が新しい順に読み込みます（登録・未登録どちらも対象、件数無制限・100件ごとにページ送り）。下の欄に入力すると一覧を絞り込みます（一覧は最初に一度だけ読み込み、以降はその場で絞り込むだけなので通信は発生しません）。</p>
-    <button id="reload-accounts-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
-    <div class="radio-row" style="margin-bottom:10px;">
-      <label><input type="checkbox" id="accounts-filter-registered" checked> 登録済みユーザー</label>
-      <label><input type="checkbox" id="accounts-filter-unregistered"> 未登録ユーザー</label>
-    </div>
-    <div class="input-group">
-      <label for="accounts-filter">絞り込み（登録ID・名前・FB名前）</label>
-      <input type="text" id="accounts-filter" placeholder="入力するとリアルタイムで絞り込みます">
-    </div>
-    <details style="margin-bottom:10px;">
-      <summary style="cursor:pointer; font-size:0.85rem; color:#555;">詳細フィルター</summary>
-      <div style="margin-top:8px;">
-        <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">ロール</p>
-        <div id="accounts-filter-roles" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;"></div>
-        <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;">
-          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-cardback"> 裏面設定中のみ</label>
-          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-storage"> 画像保管庫に保存ありのみ</label>
-          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-savedimage-any"> 画像保存(いずれか)ありのみ</label>
+    <details id="accounts-details">
+      <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">ユーザー一覧</summary>
+      <div style="margin-top:14px;">
+        <p class="section-desc">omikujiUsers全体から、1度もおみくじを引いたことがない人を除き、最終更新日が新しい順に読み込みます（登録・未登録どちらも対象、件数無制限・30件ごとにページ送り）。下の欄に入力すると一覧を絞り込みます（一覧は最初に一度だけ読み込み、以降はその場で絞り込むだけなので通信は発生しません）。</p>
+        <button id="reload-accounts-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+        <div class="radio-row" style="margin-bottom:10px;">
+          <label><input type="checkbox" id="accounts-filter-registered" checked> 登録済みユーザー</label>
+          <label><input type="checkbox" id="accounts-filter-unregistered"> 未登録ユーザー</label>
         </div>
-        <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">画像メーカー系(個別・複数選択でいずれか一致)</p>
-        <div id="accounts-filter-savedimage-sites" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;"></div>
-        <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">フレンド承認板</p>
-        <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;">
-          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-registered"> 登録ありのみ</label>
-          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-matched"> マッチングありのみ</label>
-          <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-want-partner"> 恋人希望のみ</label>
+        <div class="input-group">
+          <label for="accounts-filter">絞り込み（登録ID・名前・FB名前）</label>
+          <input type="text" id="accounts-filter" placeholder="入力するとリアルタイムで絞り込みます">
         </div>
-        <div id="accounts-filter-fb-genders" style="display:flex; flex-wrap:wrap; gap:8px 14px;"></div>
+        <details style="margin-bottom:10px;">
+          <summary style="cursor:pointer; font-size:0.85rem; color:#555;">詳細フィルター</summary>
+          <div style="margin-top:8px;">
+            <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">ロール</p>
+            <div id="accounts-filter-roles" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;"></div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;">
+              <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-cardback"> 裏面設定中のみ</label>
+              <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-storage"> 画像保管庫に保存ありのみ</label>
+              <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-savedimage-any"> 画像保存(いずれか)ありのみ</label>
+            </div>
+            <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">画像メーカー系(個別・複数選択でいずれか一致)</p>
+            <div id="accounts-filter-savedimage-sites" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;"></div>
+            <p style="font-size:0.78rem; color:#777; margin-bottom:4px;">フレンド承認板</p>
+            <div style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-bottom:10px;">
+              <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-registered"> 登録ありのみ</label>
+              <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-matched"> マッチングありのみ</label>
+              <label style="display:inline-flex; align-items:center; gap:4px; font-size:0.82rem;"><input type="checkbox" id="accounts-filter-fb-want-partner"> 恋人希望のみ</label>
+            </div>
+            <div id="accounts-filter-fb-genders" style="display:flex; flex-wrap:wrap; gap:8px 14px;"></div>
+          </div>
+        </details>
+        <details style="margin-bottom:10px;">
+          <summary style="cursor:pointer; font-size:0.85rem; color:#555;">表示する列を選ぶ</summary>
+          <div id="accounts-column-toggles" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:8px;"></div>
+        </details>
+        <div id="accounts-count" class="section-desc" style="margin:0 0 6px;"></div>
+        <div style="overflow-x:auto;">
+          <div id="accounts-list"></div>
+        </div>
       </div>
     </details>
-    <details style="margin-bottom:10px;">
-      <summary style="cursor:pointer; font-size:0.85rem; color:#555;">表示する列を選ぶ</summary>
-      <div id="accounts-column-toggles" style="display:flex; flex-wrap:wrap; gap:8px 14px; margin-top:8px;"></div>
-    </details>
-    <div id="accounts-count" class="section-desc" style="margin:0 0 6px;"></div>
-    <div style="overflow-x:auto;">
-      <div id="accounts-list"></div>
-    </div>
   </section>
 
   <section class="section" id="search-section">
@@ -445,9 +459,9 @@
   <img id="admin-lightbox-img" src="" alt="" style="max-width:90vw; max-height:90vh; border-radius:8px;">
 </div>
 
-<span id="site-version" class="site-version">v1.1</span>
+<span id="site-version" class="site-version">v1.2</span>
 
-<script type="module" src="admin.js?v=18"></script>
+<script type="module" src="admin.js?v=19"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

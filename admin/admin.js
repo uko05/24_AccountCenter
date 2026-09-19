@@ -9,7 +9,7 @@ import {
 
 // 一覧は件数無制限で全件取得し、表示だけこの件数単位でページ分割する
 // (1ページに全件出すと縦に長くなりすぎるため)。
-const ACCOUNTS_PAGE_SIZE = 100;
+const ACCOUNTS_PAGE_SIZE = 30;
 // オークション履歴・UP取得履歴系(2026-09-20追加)の1ページあたりの表示件数。
 // ユーザー一覧と違ってこちらは監視用途で件数が多くなりがちなので、デフォルトで
 // 折りたたんでおき(index.html側の<details>にopenを付けない)、ページも小さめにする。
@@ -952,14 +952,13 @@ const CAMPAIGN_TYPE_BANNER_URLS = {
 const campaignListEl = document.getElementById('campaign-list');
 let latestCampaignsAdmin = [];
 
-function updateCampaignFieldVisibility() {
-  const type = document.getElementById('campaign-type')?.value;
-  Object.keys(CAMPAIGN_TYPE_LABELS).forEach((t) => {
-    document.getElementById(`campaign-field-${t}`)?.classList.toggle('hidden', t !== type);
+// 種類はチェックボックス化してあり(複数選択可)、チェックしたものだけその場で
+// 詳細入力欄を出す(1つの<select>で1種類だけ選ぶ方式から2026-09-20に変更)。
+document.querySelectorAll('.campaign-type-checkbox').forEach((cb) => {
+  cb.addEventListener('change', () => {
+    document.getElementById(`campaign-field-${cb.value}`)?.classList.toggle('hidden', !cb.checked);
   });
-}
-document.getElementById('campaign-type')?.addEventListener('change', updateCampaignFieldVisibility);
-updateCampaignFieldVisibility();
+});
 
 document.getElementById('reload-campaigns-btn')?.addEventListener('click', loadCampaigns);
 
@@ -1040,17 +1039,26 @@ function renderCampaigns() {
   });
 }
 
+// 種類はチェックボックスで複数選択できる(2026-09-20〜)。チェックした種類の数だけ
+// キャンペーンを作成する(名前・開始日時・開催日数・バナー・管理者限定は全種類共通、
+// 倍率/定額/段階/還元率だけ種類ごとに個別入力)。どれか1つでも入力不備があれば
+// その場でエラーにして全体を中断する(一部だけ作成される中途半端な状態を避ける)。
 document.getElementById('campaign-create-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msgEl = document.getElementById('campaign-create-msg');
   msgEl.classList.remove('ok', 'error');
 
-  const type = document.getElementById('campaign-type').value;
+  const checkedTypes = [...document.querySelectorAll('.campaign-type-checkbox:checked')].map((cb) => cb.value);
   const label = document.getElementById('campaign-label').value.trim();
   const startsRaw = document.getElementById('campaign-starts').value;
   const days = Number(document.getElementById('campaign-days').value);
   const startsAtMs = startsRaw ? new Date(startsRaw).getTime() : NaN;
 
+  if (checkedTypes.length === 0) {
+    msgEl.textContent = '種類を1つ以上チェックしてください。';
+    msgEl.classList.add('error');
+    return;
+  }
   if (!label || !Number.isFinite(startsAtMs) || !Number.isFinite(days) || days < 1) {
     msgEl.textContent = '名前・開始日時・開催日数を入力してください。';
     msgEl.classList.add('error');
@@ -1061,61 +1069,70 @@ document.getElementById('campaign-create-form').addEventListener('submit', async
   const bannerImageUrl = document.getElementById('campaign-banner-url').value.trim();
   const adminOnly = document.getElementById('campaign-admin-only').checked;
 
-  const campaignData = {
-    type, label, enabled: true,
-    startsAt: Timestamp.fromMillis(startsAtMs),
-    endsAt: Timestamp.fromMillis(endsAtMs),
-    bannerImageUrl: bannerImageUrl || null,
-    adminOnly,
-    createdAt: serverTimestamp(),
-  };
+  const campaignDataList = [];
+  for (const type of checkedTypes) {
+    const data = {
+      type, label, enabled: true,
+      startsAt: Timestamp.fromMillis(startsAtMs),
+      endsAt: Timestamp.fromMillis(endsAtMs),
+      bannerImageUrl: bannerImageUrl || null,
+      adminOnly,
+      createdAt: serverTimestamp(),
+    };
 
-  if (type === 'sellerBonus') {
-    const multiplier = Number(document.getElementById('campaign-multiplier').value);
-    if (!Number.isFinite(multiplier) || multiplier <= 1) {
-      msgEl.textContent = '倍率は1より大きい数値を入力してください。';
-      msgEl.classList.add('error');
-      return;
+    if (type === 'sellerBonus') {
+      const multiplier = Number(document.getElementById('campaign-multiplier').value);
+      if (!Number.isFinite(multiplier) || multiplier <= 1) {
+        msgEl.textContent = '出品者ボーナス: 倍率は1より大きい数値を入力してください。';
+        msgEl.classList.add('error');
+        return;
+      }
+      data.multiplier = multiplier;
+    } else if (type === 'listingBonus') {
+      const bonusAmount = Number(document.getElementById('campaign-bonusAmount').value);
+      if (!Number.isInteger(bonusAmount) || bonusAmount < 1) {
+        msgEl.textContent = '出品即時ボーナス: 出品時にもらえるUPを入力してください。';
+        msgEl.classList.add('error');
+        return;
+      }
+      data.bonusAmount = bonusAmount;
+    } else if (type === 'listingCountBonus') {
+      const tiers = [];
+      for (let i = 1; i <= 5; i++) {
+        const count = Number(document.getElementById(`campaign-tier-count-${i}`).value);
+        const bonus = Number(document.getElementById(`campaign-tier-bonus-${i}`).value);
+        if (Number.isInteger(count) && count > 0 && Number.isInteger(bonus) && bonus > 0) tiers.push({ count, bonus });
+      }
+      if (!tiers.length) {
+        msgEl.textContent = '出品数ボーナス: 段階設定を1つ以上入力してください。';
+        msgEl.classList.add('error');
+        return;
+      }
+      tiers.sort((a, b) => a.count - b.count);
+      data.tiers = tiers;
+    } else if (type === 'bidderBonus') {
+      const rate = Number(document.getElementById('campaign-rate').value);
+      if (!Number.isFinite(rate) || rate <= 0) {
+        msgEl.textContent = '落札者キャッシュバック: 還元率を入力してください。';
+        msgEl.classList.add('error');
+        return;
+      }
+      data.rate = rate;
     }
-    campaignData.multiplier = multiplier;
-  } else if (type === 'listingBonus') {
-    const bonusAmount = Number(document.getElementById('campaign-bonusAmount').value);
-    if (!Number.isInteger(bonusAmount) || bonusAmount < 1) {
-      msgEl.textContent = '出品時にもらえるUPを入力してください。';
-      msgEl.classList.add('error');
-      return;
-    }
-    campaignData.bonusAmount = bonusAmount;
-  } else if (type === 'listingCountBonus') {
-    const tiers = [];
-    for (let i = 1; i <= 5; i++) {
-      const count = Number(document.getElementById(`campaign-tier-count-${i}`).value);
-      const bonus = Number(document.getElementById(`campaign-tier-bonus-${i}`).value);
-      if (Number.isInteger(count) && count > 0 && Number.isInteger(bonus) && bonus > 0) tiers.push({ count, bonus });
-    }
-    if (!tiers.length) {
-      msgEl.textContent = '段階設定を1つ以上入力してください。';
-      msgEl.classList.add('error');
-      return;
-    }
-    tiers.sort((a, b) => a.count - b.count);
-    campaignData.tiers = tiers;
-  } else if (type === 'bidderBonus') {
-    const rate = Number(document.getElementById('campaign-rate').value);
-    if (!Number.isFinite(rate) || rate <= 0) {
-      msgEl.textContent = '還元率を入力してください。';
-      msgEl.classList.add('error');
-      return;
-    }
-    campaignData.rate = rate;
+
+    campaignDataList.push(data);
   }
 
   try {
-    await addDoc(collection(db, 'ukoAuctionCampaigns'), campaignData);
-    msgEl.textContent = 'キャンペーンを作成しました！';
+    await Promise.all(campaignDataList.map((data) => addDoc(collection(db, 'ukoAuctionCampaigns'), data)));
+    msgEl.textContent = campaignDataList.length > 1
+      ? `キャンペーンを${campaignDataList.length}件作成しました！`
+      : 'キャンペーンを作成しました！';
     msgEl.classList.add('ok');
     document.getElementById('campaign-create-form').reset();
-    updateCampaignFieldVisibility();
+    Object.keys(CAMPAIGN_TYPE_LABELS).forEach((t) => {
+      document.getElementById(`campaign-field-${t}`)?.classList.add('hidden');
+    });
     loadCampaigns();
   } catch (err) {
     console.error('[admin] campaign create failed', err);
