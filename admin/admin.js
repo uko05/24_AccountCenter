@@ -954,11 +954,30 @@ let latestCampaignsAdmin = [];
 
 // 種類はチェックボックス化してあり(複数選択可)、チェックしたものだけその場で
 // 詳細入力欄を出す(1つの<select>で1種類だけ選ぶ方式から2026-09-20に変更)。
+// 併せて、チェックした種類のバナー(バナー画像URLを入力していれば個別指定分、
+// 空ならCAMPAIGN_TYPE_BANNER_URLSの既定分)もその場でプレビュー表示する。
+function updateCampaignBannerPreviews() {
+  const customUrl = document.getElementById('campaign-banner-url')?.value.trim();
+  Object.keys(CAMPAIGN_TYPE_LABELS).forEach((type) => {
+    const img = document.getElementById(`campaign-banner-preview-${type}`);
+    const cb = document.querySelector(`.campaign-type-checkbox[value="${type}"]`);
+    if (!img || !cb) return;
+    const url = cb.checked ? (customUrl || CAMPAIGN_TYPE_BANNER_URLS[type]) : null;
+    if (url) {
+      img.src = url;
+      img.style.display = 'block';
+    } else {
+      img.style.display = 'none';
+    }
+  });
+}
 document.querySelectorAll('.campaign-type-checkbox').forEach((cb) => {
   cb.addEventListener('change', () => {
     document.getElementById(`campaign-field-${cb.value}`)?.classList.toggle('hidden', !cb.checked);
+    updateCampaignBannerPreviews();
   });
 });
+document.getElementById('campaign-banner-url')?.addEventListener('input', updateCampaignBannerPreviews);
 
 document.getElementById('reload-campaigns-btn')?.addEventListener('click', loadCampaigns);
 
@@ -1133,6 +1152,7 @@ document.getElementById('campaign-create-form').addEventListener('submit', async
     Object.keys(CAMPAIGN_TYPE_LABELS).forEach((t) => {
       document.getElementById(`campaign-field-${t}`)?.classList.add('hidden');
     });
+    updateCampaignBannerPreviews();
     loadCampaigns();
   } catch (err) {
     console.error('[admin] campaign create failed', err);
