@@ -1587,6 +1587,80 @@ function defaultEditTabForCurrentFilter() {
   return tab;
 }
 
+// ===== UP獲得方法の内訳(ユーザー編集画面「原神おみくじ」タブ用、2026-09-19追加) =====
+// 全ユーザー横断の「UP取得履歴」セクション2つ(いいね/オークション・ミッション)と
+// 同じデータソースを、このユーザー1人分だけに絞って合計する。openEditor()内から
+// awaitせず呼ぶ(読み込みが多少遅れても他の項目の表示をブロックしないため)。
+const UP_EARNINGS_LOG_TYPE_LABELS = {
+  auctionSale: 'オークション売上',
+  auctionCashback: '落札キャッシュバック',
+  auctionListingBonus: '出品ボーナス',
+  missionClaim: 'ミッション報酬',
+};
+async function renderUpEarningsBreakdown(uid, totalLikesReceived) {
+  const container = document.getElementById('edit-up-earnings');
+  if (!container) return;
+  container.textContent = '読み込み中…';
+
+  try {
+    const [givenSnap, receivedSnap, logSnap] = await Promise.all([
+      getDocs(query(collectionGroup(db, 'likes'), where('likerUserId', '==', uid))),
+      getDocs(query(collectionGroup(db, 'likes'), where('receiverUserId', '==', uid))),
+      getDocs(query(collection(db, 'ukoPointsLog'), where('userId', '==', uid))),
+    ]);
+
+    // あげいいね: likerUserIdは最初から全いいねドキュメントにあるので、件数・合計とも
+    // 正確(giveAmount未設定=2026-09-19のブースト機能より前のいいねは基準値1UPとみなす)。
+    let givenUp = 0;
+    givenSnap.docs.forEach((d) => { givenUp += d.data().giveAmount ?? 1; });
+    const givenCount = givenSnap.size;
+
+    // もらいいね: receiverUserIdは2026-09-19に追加したフィールドなので、それより前の
+    // いいねには付いていない。そちらはtotalLikesReceived(ユーザードキュメントの
+    // 累計カウンター)との差分で件数を逆算し、ブースト機能が無かった時代=基準値2UP
+    // 確定として合算する(推測ではなく、ブースト自体が存在しなかった期間なので確定できる)。
+    let receivedUpTagged = 0;
+    receivedSnap.docs.forEach((d) => { receivedUpTagged += d.data().receiveAmount ?? 2; });
+    const receivedTaggedCount = receivedSnap.size;
+    const legacyReceivedCount = Math.max(0, (totalLikesReceived || 0) - receivedTaggedCount);
+    const receivedUp = receivedUpTagged + legacyReceivedCount * 2;
+    const receivedCount = receivedTaggedCount + legacyReceivedCount;
+
+    // オークション・ミッション: ukoPointsLog(種類ごとに件数・合計を集計するだけ)。
+    const logTotals = {};
+    logSnap.docs.forEach((d) => {
+      const { type, amount } = d.data();
+      if (!logTotals[type]) logTotals[type] = { count: 0, totalUp: 0 };
+      logTotals[type].count += 1;
+      logTotals[type].totalUp += amount || 0;
+    });
+
+    const rows = [
+      { label: 'あげいいね', count: givenCount, totalUp: givenUp },
+      { label: 'もらいいね', count: receivedCount, totalUp: receivedUp },
+      ...Object.entries(UP_EARNINGS_LOG_TYPE_LABELS).map(([type, label]) => ({
+        label, count: logTotals[type]?.count || 0, totalUp: logTotals[type]?.totalUp || 0,
+      })),
+    ];
+    const grandTotal = rows.reduce((sum, r) => sum + r.totalUp, 0);
+
+    container.innerHTML = rows.map((r) => `
+      <div style="display:flex; justify-content:space-between; gap:10px;">
+        <span>${escapeHtml(r.label)}${r.count > 0 ? `（${r.count}件）` : ''}</span>
+        <span>+${r.totalUp}UP</span>
+      </div>
+    `).join('') + `
+      <div style="display:flex; justify-content:space-between; gap:10px; margin-top:4px; padding-top:4px; border-top:1px solid var(--border); font-weight:bold;">
+        <span>獲得合計（消費分は含まない目安）</span>
+        <span>+${grandTotal}UP</span>
+      </div>
+    `;
+  } catch (e) {
+    console.error('[admin] up earnings breakdown load failed', e);
+    container.textContent = '読み込みに失敗しました。';
+  }
+}
+
 async function openEditor(uid, data, account = null) {
   currentEditUid = uid;
   currentEditData = data;
@@ -1605,6 +1679,7 @@ async function openEditor(uid, data, account = null) {
   document.getElementById('edit-max-streak').value = data.achStats?.maxStreak ?? 0;
   document.getElementById('edit-likes-received').value = data.totalLikesReceived ?? 0;
   document.getElementById('edit-likes-given').value = data.totalLikesGiven ?? 0;
+  renderUpEarningsBreakdown(uid, data.totalLikesReceived ?? 0);
   document.getElementById('edit-collection').value = (data.collection || []).join('\n');
   renderEquippedCardBack(data.equippedCardBackId);
   renderOwnedCardBacks(data.cardBacks);
