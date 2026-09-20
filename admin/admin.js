@@ -1794,11 +1794,30 @@ function defaultEditTabForCurrentFilter() {
 // awaitせず呼ぶ(読み込みが多少遅れても他の項目の表示をブロックしないため)。
 const UP_EARNINGS_LOG_TYPE_LABELS = {
   auctionSale: 'オークション売上',
-  auctionSaleBonus: '出品者ボーナス(キャンペーン)',
-  auctionCashback: '落札キャッシュバック',
-  auctionListingBonus: '出品ボーナス',
   missionClaim: 'ミッション報酬',
 };
+// キャンペーン由来のUP(auctionSaleBonus/auctionCashback/auctionListingBonus、いずれも
+// meta.campaignType/campaignIdを持つ、2026-09-20追加)は、種類ごとの単純な合計ではなく
+// 「今回(直近/開催中のキャンペーン分だけ)」と「累計(このtypeを何度開催した分も含む
+// 通算)」の2本立てで見せる。同じ種類のキャンペーンを繰り返し開催する運用のため、
+// 前回までの結果に埋もれて「今回いくら稼いだか」が分からなくならないようにするため。
+const CAMPAIGN_EARNINGS_TYPE_LABELS = {
+  sellerBonus: '出品者ボーナス(キャンペーン)',
+  bidderBonus: '落札キャッシュバック(キャンペーン)',
+  listingBonus: '出品即時ボーナス(キャンペーン)',
+  listingCountBonus: '出品数ボーナス(キャンペーン)',
+};
+// 「今回」の基準となるキャンペーンを1つ選ぶ: 開催中のものがあればそれを、無ければ
+// 直近に開始したものを採用する(終了直後にユーザー詳細を見た時も結果が拾えるように)。
+// latestCampaignsAdminはキャンペーン管理セクションのloadCampaigns()が読み込む
+// (ページ初期化時に呼ばれるため、通常はこの関数が呼ばれる時点で読み込み済み)。
+function latestCampaignOfType(type) {
+  const matches = latestCampaignsAdmin.filter((c) => c.type === type);
+  if (!matches.length) return null;
+  const active = matches.filter(isCampaignCurrentlyActive);
+  const pool = active.length ? active : matches;
+  return pool.reduce((best, c) => ((c.startsAt?.toMillis?.() || 0) > (best.startsAt?.toMillis?.() || 0) ? c : best));
+}
 async function renderUpEarningsBreakdown(uid, totalLikesReceived) {
   const container = document.getElementById('edit-up-earnings');
   if (!container) return;
@@ -1829,12 +1848,23 @@ async function renderUpEarningsBreakdown(uid, totalLikesReceived) {
     const receivedCount = receivedTaggedCount + legacyReceivedCount;
 
     // オークション・ミッション: ukoPointsLog(種類ごとに件数・合計を集計するだけ)。
+    // キャンペーン由来分(meta.campaignTypeを持つもの)は別途campaignTotalsへ集計する。
     const logTotals = {};
+    const campaignTotals = {}; // campaignType -> { cumulative, byCampaignId: Map<campaignId, amount> }
     logSnap.docs.forEach((d) => {
-      const { type, amount } = d.data();
+      const { type, amount, meta } = d.data();
       if (!logTotals[type]) logTotals[type] = { count: 0, totalUp: 0 };
       logTotals[type].count += 1;
       logTotals[type].totalUp += amount || 0;
+
+      const campaignType = meta?.campaignType;
+      if (!campaignType) return;
+      if (!campaignTotals[campaignType]) campaignTotals[campaignType] = { cumulative: 0, byCampaignId: new Map() };
+      campaignTotals[campaignType].cumulative += amount || 0;
+      if (meta.campaignId) {
+        const map = campaignTotals[campaignType].byCampaignId;
+        map.set(meta.campaignId, (map.get(meta.campaignId) || 0) + (amount || 0));
+      }
     });
 
     const rows = [
@@ -1844,12 +1874,24 @@ async function renderUpEarningsBreakdown(uid, totalLikesReceived) {
         label, count: logTotals[type]?.count || 0, totalUp: logTotals[type]?.totalUp || 0,
       })),
     ];
-    const grandTotal = rows.reduce((sum, r) => sum + r.totalUp, 0);
+    const campaignRows = Object.entries(CAMPAIGN_EARNINGS_TYPE_LABELS).map(([type, label]) => {
+      const t = campaignTotals[type];
+      const latest = latestCampaignOfType(type);
+      const thisTime = (t && latest) ? (t.byCampaignId.get(latest.id) || 0) : 0;
+      return { label, thisTime, cumulative: t?.cumulative || 0 };
+    });
+    const grandTotal = rows.reduce((sum, r) => sum + r.totalUp, 0)
+      + campaignRows.reduce((sum, r) => sum + r.cumulative, 0);
 
     container.innerHTML = rows.map((r) => `
       <div style="display:flex; justify-content:space-between; gap:10px;">
         <span>${escapeHtml(r.label)}${r.count > 0 ? `（${r.count}件）` : ''}</span>
         <span>+${r.totalUp}UP</span>
+      </div>
+    `).join('') + campaignRows.map((r) => `
+      <div style="display:flex; justify-content:space-between; gap:10px;">
+        <span>${escapeHtml(r.label)}</span>
+        <span>今回 +${r.thisTime}UP／累計 +${r.cumulative}UP</span>
       </div>
     `).join('') + `
       <div style="display:flex; justify-content:space-between; gap:10px; margin-top:4px; padding-top:4px; border-top:1px solid var(--border); font-weight:bold;">
