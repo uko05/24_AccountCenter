@@ -1272,6 +1272,11 @@ const ACCOUNTS_SORT_COLUMNS = {
     get: (r) => r.friendBoardName || '',
     render: (r) => escapeHtml(r.friendBoardName || '-'),
   },
+  friendBoardGenshinUid: {
+    label: 'FB原神UID', width: '10%',
+    get: (r) => r.friendBoardGenshinUid || '',
+    render: (r) => escapeHtml(r.friendBoardGenshinUid || '-'),
+  },
   friendBoardMatchCount: {
     label: 'マッチング数', width: '1%',
     get: (r) => r.friendBoardMatchCount || 0,
@@ -1457,11 +1462,13 @@ async function loadAccounts() {
   // 同じデータソース(生のgender/friendPreference配列, wantPartnerキー)。
   const friendBoardNameByOmikujiId = new Map();
   const friendBoardGenderByOmikujiId = new Map();
+  const friendBoardGenshinUidByOmikujiId = new Map();
   const friendBoardWantPartnerSet = new Set();
   friendBoardProfilesSnap.docs.forEach((d) => {
     const data = d.data() || {};
     if (data.displayName) friendBoardNameByOmikujiId.set(d.id, data.displayName);
     if (data.gender) friendBoardGenderByOmikujiId.set(d.id, data.gender);
+    if (data.genshinUid) friendBoardGenshinUidByOmikujiId.set(d.id, data.genshinUid);
     if (Array.isArray(data.friendPreference) && data.friendPreference.includes('wantPartner')) {
       friendBoardWantPartnerSet.add(d.id);
     }
@@ -1520,6 +1527,7 @@ async function loadAccounts() {
         hasFriendBoardPost: hasFriendBoardPostSet.has(userDoc.id),
         friendBoardName: friendBoardNameByOmikujiId.get(userDoc.id) || '',
         friendBoardGender: friendBoardGenderByOmikujiId.get(userDoc.id) || '',
+        friendBoardGenshinUid: friendBoardGenshinUidByOmikujiId.get(userDoc.id) || '',
         friendBoardMatchCount: friendBoardMatchCountByOmikujiId.get(userDoc.id) || 0,
         friendBoardWantPartner: friendBoardWantPartnerSet.has(userDoc.id),
       };
