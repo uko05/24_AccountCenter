@@ -1277,6 +1277,10 @@ const ACCOUNTS_SORT_COLUMNS = {
     get: (r) => r.friendBoardGenshinUid || '',
     render: (r) => escapeHtml(r.friendBoardGenshinUid || '-'),
   },
+  campaignUp: {
+    label: 'キャンペーン取得UP', width: '1%',
+    get: (r) => r.campaignUp || 0,
+  },
   friendBoardMatchCount: {
     label: 'マッチング数', width: '1%',
     get: (r) => r.friendBoardMatchCount || 0,
@@ -1432,7 +1436,7 @@ async function loadAccounts() {
   accountsListEl.innerHTML = '読み込み中…';
   accountsCurrentPage = 1;
 
-  const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap, friendBoardPostsSnap, friendBoardProfilesSnap, friendBoardApplicationsSnap] = await Promise.all([
+  const [usersSnap, linkSnap, roleSnap, savedImagesSnap, storageImagesSnap, friendBoardPostsSnap, friendBoardProfilesSnap, friendBoardApplicationsSnap, upLogSnap] = await Promise.all([
     getDocs(query(collection(db, 'omikujiUsers'), orderBy('updatedAt', 'desc'))),
     getDocs(collection(db, 'accountLinks')),
     getDocs(collection(db, 'sharedUserRoles')),
@@ -1441,7 +1445,19 @@ async function loadAccounts() {
     getDocs(collection(db, 'friendBoardPosts')),
     getDocs(collection(db, 'friendBoardProfiles')),
     getDocs(collection(db, 'friendBoardApplications')),
+    getDocs(collection(db, 'ukoPointsLog')),
   ]);
+
+  // キャンペーン取得UP(2026-09-20追加) = ukoPointsLogのうちmeta.campaignTypeを持つ
+  // エントリ(auctionSaleBonus/auctionCashback/auctionListingBonus、いずれもキャンペーン
+  // 由来)をuserIdごとに合計した、全期間・全キャンペーン種類を通算した値。種類ごとの
+  // 内訳(今回/累計)は編集画面のUP獲得方法欄で見られるので、一覧ではまとめた合計だけ出す。
+  const campaignUpByOmikujiId = new Map();
+  upLogSnap.docs.forEach((d) => {
+    const { userId, amount, meta } = d.data();
+    if (!meta?.campaignType) return;
+    campaignUpByOmikujiId.set(userId, (campaignUpByOmikujiId.get(userId) || 0) + (amount || 0));
+  });
 
   const linkByOmikujiId = new Map();
   linkSnap.docs.forEach((linkDoc) => {
@@ -1528,6 +1544,7 @@ async function loadAccounts() {
         friendBoardName: friendBoardNameByOmikujiId.get(userDoc.id) || '',
         friendBoardGender: friendBoardGenderByOmikujiId.get(userDoc.id) || '',
         friendBoardGenshinUid: friendBoardGenshinUidByOmikujiId.get(userDoc.id) || '',
+        campaignUp: campaignUpByOmikujiId.get(userDoc.id) || 0,
         friendBoardMatchCount: friendBoardMatchCountByOmikujiId.get(userDoc.id) || 0,
         friendBoardWantPartner: friendBoardWantPartnerSet.has(userDoc.id),
       };
@@ -1576,7 +1593,7 @@ function renderAccounts(filterText) {
     storageImageCount: a.storageImageCount, hasFriendBoardPost: a.hasFriendBoardPost,
     friendBoardName: a.friendBoardName, friendBoardMatchCount: a.friendBoardMatchCount,
     friendBoardWantPartner: a.friendBoardWantPartner, friendBoardGender: a.friendBoardGender,
-    friendBoardGenshinUid: a.friendBoardGenshinUid,
+    friendBoardGenshinUid: a.friendBoardGenshinUid, campaignUp: a.campaignUp,
   }));
 
   if (accountsSortKey) {
