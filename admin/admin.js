@@ -1576,6 +1576,7 @@ function renderAccounts(filterText) {
     storageImageCount: a.storageImageCount, hasFriendBoardPost: a.hasFriendBoardPost,
     friendBoardName: a.friendBoardName, friendBoardMatchCount: a.friendBoardMatchCount,
     friendBoardWantPartner: a.friendBoardWantPartner, friendBoardGender: a.friendBoardGender,
+    friendBoardGenshinUid: a.friendBoardGenshinUid,
   }));
 
   if (accountsSortKey) {
