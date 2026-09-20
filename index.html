@@ -44,6 +44,22 @@
     <div class="uid-box" id="current-uid" data-i18n="uidLoading">読み込み中…</div>
   </section>
 
+  <section class="section" id="link-mode-section">
+    <div class="section-title" data-i18n="linkModeTitle">他サイトへのリンクの開き方</div>
+    <p class="section-desc" data-i18n="linkModeDesc">うーこの部屋の他のサイト（メニューのリンクなど）を新しいタブで開くか、同じタブで開くか選べます。登録不要でこの端末・IDに反映されます。</p>
+    <div class="link-mode-options">
+      <label class="link-mode-option">
+        <input type="radio" name="link-mode" value="newTab" id="link-mode-newTab" checked>
+        <span data-i18n="linkModeNewTab">新しいタブで開く（既定）</span>
+      </label>
+      <label class="link-mode-option">
+        <input type="radio" name="link-mode" value="sameTab" id="link-mode-sameTab">
+        <span data-i18n="linkModeSameTab">同じタブで開く（画面がそのまま切り替わる）</span>
+      </label>
+    </div>
+    <p class="section-desc" id="link-mode-msg"></p>
+  </section>
+
   <section class="section" id="register-section">
     <div class="section-title" data-i18n="registerTitle">アカウント登録（任意）</div>
     <p class="section-desc" data-i18n="registerDesc">ID・パスワードを設定すると、機種変した際もログインするだけで今までのデータを引き継げます。登録しなくても今まで通り使えます。</p>

@@ -31,6 +31,12 @@ const i18n = {
     uidDesc: 'この端末でおみくじサイトなどを使うと自動的に発行されるIDです。通常はこの値を覚えておく必要はありません。',
     uidLoading: '読み込み中…',
     uidNone: 'この端末ではまだ発行されていません（おみくじサイトを一度開くと発行されます）',
+    linkModeTitle: '他サイトへのリンクの開き方',
+    linkModeDesc: 'うーこの部屋の他のサイト（メニューのリンクなど）を新しいタブで開くか、同じタブで開くか選べます。登録不要でこの端末・IDに反映されます。',
+    linkModeNewTab: '新しいタブで開く（既定）',
+    linkModeSameTab: '同じタブで開く（画面がそのまま切り替わる）',
+    linkModeSaveOk: '設定しました。',
+    linkModeSaveFail: '設定に失敗しました。時間をおいて再度お試しください。',
     registerTitle: 'アカウント登録（任意）',
     registerDesc: 'ID・パスワードを設定すると、機種変した際もログインするだけで今までのデータを引き継げます。登録しなくても今まで通り使えます。',
     labelId: 'ID',
@@ -81,6 +87,12 @@ const i18n = {
     uidDesc: 'This ID is issued automatically on this device when you use a site like the omikuji. You usually do not need to remember it.',
     uidLoading: 'Loading…',
     uidNone: 'Not issued on this device yet (visit the omikuji site once to get one).',
+    linkModeTitle: 'How links to other sites open',
+    linkModeDesc: 'Choose whether links to other うーこの部屋 sites (like the menu) open in a new tab or the same tab. No registration needed — this applies to this device/ID.',
+    linkModeNewTab: 'Open in a new tab (default)',
+    linkModeSameTab: 'Open in the same tab (navigates away)',
+    linkModeSaveOk: 'Saved.',
+    linkModeSaveFail: 'Failed to save. Please try again later.',
     registerTitle: 'Register an account (optional)',
     registerDesc: 'Set an ID and password to keep your data even after switching devices — just log in on the new device. Everything still works fine without registering.',
     labelId: 'ID',
@@ -194,6 +206,50 @@ function authErrorMessage(e) {
 
 // ===== UID表示 =====
 const uidBox = document.getElementById('current-uid');
+
+// ===== リンクの開き方設定(2026-09-21追加) =====
+// omikujiUsers/{uid}.linkOpenMode('newTab'(既定)|'sameTab')。登録(ログイン)は
+// 不要で、匿名UIDだけで保存・反映される。実際にリンクのtargetを出し分ける処理は
+// 00_TopPage/shared/sidebar.js(および18_gazou/17_storageのベンダー版)側にある
+// (uko05.github.io宛リンクをdocument全体から自動検出して適用する仕組み)。
+// このページ自身もsidebar.jsを読み込んでいるため、window.UkoLinkMode.apply()を
+// 呼んで変更直後にこのページ内のリンクにも即反映させる。
+const linkModeRadios = document.querySelectorAll('input[name="link-mode"]');
+const linkModeMsg = document.getElementById('link-mode-msg');
+
+async function loadLinkModePref() {
+  const uidNow = getCurrentOmikujiUid();
+  if (!uidNow) return; // 未発行ならHTML側の既定(newTab)のまま
+  try {
+    const snap = await getDoc(doc(db, 'omikujiUsers', uidNow));
+    const mode = snap.exists() && snap.data().linkOpenMode === 'sameTab' ? 'sameTab' : 'newTab';
+    linkModeRadios.forEach((r) => { r.checked = r.value === mode; });
+  } catch (e) {
+    console.error('[account] link mode load failed', e);
+  }
+}
+
+linkModeRadios.forEach((radio) => {
+  radio.addEventListener('change', async () => {
+    const uidNow = getCurrentOmikujiUid();
+    if (!uidNow) {
+      showMsg(linkModeMsg, t('msgNeedOmikujiFirst'), true);
+      return;
+    }
+    const mode = radio.value;
+    try {
+      await setDoc(doc(db, 'omikujiUsers', uidNow), { linkOpenMode: mode }, { merge: true });
+      try { localStorage.setItem('ukoLinkOpenMode', mode); } catch (e) {}
+      if (window.UkoLinkMode) window.UkoLinkMode.apply(mode);
+      showMsg(linkModeMsg, t('linkModeSaveOk'), false);
+    } catch (e) {
+      console.error('[account] link mode save failed', e);
+      showMsg(linkModeMsg, t('linkModeSaveFail'), true);
+    }
+  });
+});
+
+loadLinkModePref();
 
 // ===== 登録 =====
 const registerForm = document.getElementById('register-form');

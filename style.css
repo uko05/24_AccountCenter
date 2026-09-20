@@ -207,6 +207,20 @@ main.wide { max-width: 980px; }
   color: var(--text);
 }
 
+.link-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.link-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.link-mode-option input { cursor: pointer; }
+
 .contact-links {
   display: flex;
   align-items: center;
