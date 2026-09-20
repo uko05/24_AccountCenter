@@ -938,7 +938,7 @@ function renderUpLogHistory() {
 // onSnapshotで購読しているため)。
 const CAMPAIGN_TYPE_LABELS = {
   sellerBonus: '出品者ボーナス(落札額×倍率)',
-  listingBonus: '出品即時ボーナス(定額)',
+  listingBonus: '出品ボーナス(定額)',
   listingCountBonus: '出品数ボーナス(段階制)',
   bidderBonus: '落札者キャッシュバック(落札額の%還元)',
 };
@@ -1025,6 +1025,7 @@ function renderCampaigns() {
       <div style="font-size:0.78rem; color:var(--muted);">
         ${escapeHtml(campaignDetailText(c))}<br>
         ${fmtTimestamp(c.startsAt)} 〜 ${fmtTimestamp(c.endsAt)}
+        ${c.recapMailSentAt ? `<br>✅集計メール送信済み（${fmtTimestamp(c.recapMailSentAt)}、${c.recapMailSentToCount ?? '?'}人）` : ''}
       </div>
       ${CAMPAIGN_TYPE_BANNER_URLS[c.type] ? `<img src="${escapeHtml(CAMPAIGN_TYPE_BANNER_URLS[c.type])}" alt="" style="max-width:200px; max-height:80px; object-fit:contain; margin-top:6px; border:1px solid var(--border); border-radius:4px;">` : ''}
       <div class="btn-row">
@@ -1062,8 +1063,13 @@ function renderCampaigns() {
 // 「累計」= 同じtype(例: sellerBonus)の過去〜現在の全開催分を合わせてuserIdごとに
 // 合計したもの(同じキャンペーン種類を何度も開催する運用のため、稼いだ実感を
 // 「今回いくら」だけでなく「このボーナスで通算いくら」でも伝えたい、という要望から)。
-// UPは獲得した時点(落札確定/出品時)で既に付与済みなので、このメールはrewards:[]の
-// 通知のみで、UPを二重に渡すものではない。
+// **UPの実際の付与はこのメールが担う(2026-09-20変更)**: 4種類とも出品/落札確定の
+// 時点ではukoPointsLogに記録するだけでukoPointsは増やしておらず、このメールの
+// rewardsフィールド(claimMail/feed.jsが「受け取る」操作でincrementする)で初めて
+// 加算される。そのため同じキャンペーンに対してこの関数を2回送ると二重付与になる
+// ——campaign doc側にrecapMailSentAt/recapMailSentToCountを記録し、送信済みなら
+// 強めの警告を出してから確認を取る(誤操作防止。完全なブロックはしない=本当に
+// 追加分だけ再送したいケースもあり得るため)。
 async function sendCampaignRecapMail(c) {
   const typeLabel = CAMPAIGN_TYPE_LABELS[c.type] || c.type;
   try {
@@ -1086,23 +1092,32 @@ async function sendCampaignRecapMail(c) {
       cumTotals.set(userId, (cumTotals.get(userId) || 0) + (amount || 0));
     });
 
-    if (!confirm(`「${typeLabel}」の結果メールを${thisTotals.size}人に送信します。よろしいですか？`)) return;
+    const confirmMsg = c.recapMailSentAt
+      ? `⚠️このキャンペーンは${fmtTimestamp(c.recapMailSentAt)}に集計メールを送信済みです。再送すると対象者に二重にUPが付与されます。本当に「${typeLabel}」の結果メールを${thisTotals.size}人に再送しますか？`
+      : `「${typeLabel}」の結果メールを${thisTotals.size}人に送信します。メールの「受け取る」操作でUPが実際に付与されます。よろしいですか？`;
+    if (!confirm(confirmMsg)) return;
 
     const expiresAt = Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const period = `${fmtTimestamp(c.startsAt)} 〜 ${fmtTimestamp(c.endsAt)}`;
 
     await Promise.all([...thisTotals.entries()].map(([userId, thisAmt]) => {
       const cumAmt = cumTotals.get(userId) || thisAmt;
-      const message = `『${typeLabel}』キャンペーン（${period}）で合計+${thisAmt}UP獲得しました！\n（このタイプのボーナス累計: +${cumAmt}UP）`;
+      const message = `『${typeLabel}』キャンペーン（${period}）の結果、+${thisAmt}UP獲得しました！\n（このタイプのボーナス累計: +${cumAmt}UP）\n下の「受け取る」ボタンからUPを受け取ってください。`;
       return addDoc(collection(db, 'omikujiMailBroadcasts'), {
         title: `🎉 ${typeLabel}キャンペーン結果`,
         message,
-        rewards: [],
+        rewards: [{ field: 'ukoPoints', amount: thisAmt }],
         target: { type: 'users', userIds: [userId] },
         expiresAt,
         createdAt: serverTimestamp(),
       });
     }));
+
+    await updateDoc(doc(db, 'ukoAuctionCampaigns', c.id), {
+      recapMailSentAt: serverTimestamp(),
+      recapMailSentToCount: thisTotals.size,
+    });
+    loadCampaigns();
 
     alert(`${thisTotals.size}人に送信しました。`);
   } catch (e) {
@@ -1160,7 +1175,7 @@ document.getElementById('campaign-create-form').addEventListener('submit', async
     } else if (type === 'listingBonus') {
       const bonusAmount = Number(document.getElementById('campaign-bonusAmount').value);
       if (!Number.isInteger(bonusAmount) || bonusAmount < 1) {
-        msgEl.textContent = '出品即時ボーナス: 出品時にもらえるUPを入力してください。';
+        msgEl.textContent = '出品ボーナス: 出品時にもらえるUPを入力してください。';
         msgEl.classList.add('error');
         return;
       }
@@ -1830,7 +1845,7 @@ const UP_EARNINGS_LOG_TYPE_LABELS = {
 const CAMPAIGN_EARNINGS_TYPE_LABELS = {
   sellerBonus: '出品者ボーナス(キャンペーン)',
   bidderBonus: '落札キャッシュバック(キャンペーン)',
-  listingBonus: '出品即時ボーナス(キャンペーン)',
+  listingBonus: '出品ボーナス(キャンペーン)',
   listingCountBonus: '出品数ボーナス(キャンペーン)',
 };
 // 「今回」の基準となるキャンペーンを1つ選ぶ: 開催中のものがあればそれを、無ければ
