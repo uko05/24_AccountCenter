@@ -773,6 +773,7 @@ const upLogHistoryCountEl = document.getElementById('up-log-history-count');
 const upLogHistoryFilterEl = document.getElementById('up-log-history-filter');
 const UP_LOG_TYPE_LABELS = {
   auctionSale: 'オークション売上',
+  auctionSaleBonus: '出品者ボーナス(キャンペーン)',
   auctionCashback: '落札キャッシュバック',
   auctionListingBonus: '出品ボーナス',
   missionClaim: 'ミッション報酬',
@@ -1028,6 +1029,7 @@ function renderCampaigns() {
       ${CAMPAIGN_TYPE_BANNER_URLS[c.type] ? `<img src="${escapeHtml(CAMPAIGN_TYPE_BANNER_URLS[c.type])}" alt="" style="max-width:200px; max-height:80px; object-fit:contain; margin-top:6px; border:1px solid var(--border); border-radius:4px;">` : ''}
       <div class="btn-row">
         <button class="secondary-btn" data-action="toggle">${c.enabled ? '停止する' : '有効化する'}</button>
+        <button class="secondary-btn" data-action="mail">集計メール送信</button>
         <button class="danger-btn" data-action="delete">削除</button>
       </div>
     `;
@@ -1040,6 +1042,7 @@ function renderCampaigns() {
         alert('操作に失敗しました。');
       }
     });
+    card.querySelector('[data-action="mail"]')?.addEventListener('click', () => sendCampaignRecapMail(c));
     card.querySelector('[data-action="delete"]').addEventListener('click', async () => {
       if (!confirm(`キャンペーン「${typeLabel}」（${campaignDetailText(c)}、${fmtTimestamp(c.startsAt)}〜${fmtTimestamp(c.endsAt)}）を削除しますか？（元に戻せません）`)) return;
       try {
@@ -1052,6 +1055,60 @@ function renderCampaigns() {
     });
     campaignListEl.appendChild(card);
   });
+}
+
+// ===== キャンペーンごとの集計メール送信(2026-09-20追加) =====
+// 「今回」= このキャンペーン(campaignId)由来のukoPointsLogだけをuserIdごとに合計。
+// 「累計」= 同じtype(例: sellerBonus)の過去〜現在の全開催分を合わせてuserIdごとに
+// 合計したもの(同じキャンペーン種類を何度も開催する運用のため、稼いだ実感を
+// 「今回いくら」だけでなく「このボーナスで通算いくら」でも伝えたい、という要望から)。
+// UPは獲得した時点(落札確定/出品時)で既に付与済みなので、このメールはrewards:[]の
+// 通知のみで、UPを二重に渡すものではない。
+async function sendCampaignRecapMail(c) {
+  const typeLabel = CAMPAIGN_TYPE_LABELS[c.type] || c.type;
+  try {
+    const thisSnap = await getDocs(query(collection(db, 'ukoPointsLog'), where('meta.campaignId', '==', c.id)));
+    const thisTotals = new Map(); // userId -> amount
+    thisSnap.docs.forEach((d) => {
+      const { userId, amount } = d.data();
+      thisTotals.set(userId, (thisTotals.get(userId) || 0) + (amount || 0));
+    });
+
+    if (thisTotals.size === 0) {
+      alert('このキャンペーンで獲得したUPの記録がまだありません。');
+      return;
+    }
+
+    const cumSnap = await getDocs(query(collection(db, 'ukoPointsLog'), where('meta.campaignType', '==', c.type)));
+    const cumTotals = new Map();
+    cumSnap.docs.forEach((d) => {
+      const { userId, amount } = d.data();
+      cumTotals.set(userId, (cumTotals.get(userId) || 0) + (amount || 0));
+    });
+
+    if (!confirm(`「${typeLabel}」の結果メールを${thisTotals.size}人に送信します。よろしいですか？`)) return;
+
+    const expiresAt = Timestamp.fromMillis(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const period = `${fmtTimestamp(c.startsAt)} 〜 ${fmtTimestamp(c.endsAt)}`;
+
+    await Promise.all([...thisTotals.entries()].map(([userId, thisAmt]) => {
+      const cumAmt = cumTotals.get(userId) || thisAmt;
+      const message = `『${typeLabel}』キャンペーン（${period}）で合計+${thisAmt}UP獲得しました！\n（このタイプのボーナス累計: +${cumAmt}UP）`;
+      return addDoc(collection(db, 'omikujiMailBroadcasts'), {
+        title: `🎉 ${typeLabel}キャンペーン結果`,
+        message,
+        rewards: [],
+        target: { type: 'users', userIds: [userId] },
+        expiresAt,
+        createdAt: serverTimestamp(),
+      });
+    }));
+
+    alert(`${thisTotals.size}人に送信しました。`);
+  } catch (e) {
+    console.error('[admin] campaign recap mail failed', e);
+    alert('送信に失敗しました。');
+  }
 }
 
 // 種類はチェックボックスで複数選択できる(2026-09-20〜)。チェックした種類の数だけ
@@ -1737,6 +1794,7 @@ function defaultEditTabForCurrentFilter() {
 // awaitせず呼ぶ(読み込みが多少遅れても他の項目の表示をブロックしないため)。
 const UP_EARNINGS_LOG_TYPE_LABELS = {
   auctionSale: 'オークション売上',
+  auctionSaleBonus: '出品者ボーナス(キャンペーン)',
   auctionCashback: '落札キャッシュバック',
   auctionListingBonus: '出品ボーナス',
   missionClaim: 'ミッション報酬',
