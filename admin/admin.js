@@ -376,12 +376,15 @@ async function renderCandidates(container, req, requestId) {
 }
 
 // ===== オークション履歴（落札成立分のみ。流札(unsold)は対象外） =====
+// 取得件数の上限は撤廃済み(2026-09-22)。以前は直近200件だけを取得していたため、
+// キャンペーンで取引量が急増した結果、200件より前の落札(例: 1750UPの取引)が
+// 管理画面から見えなくなっていた。ユーザー一覧・26_UkoAuction本体の出品一覧と
+// 同じ理由・同じ対応。
 const auctionHistoryListEl = document.getElementById('auction-history-list');
 const auctionHistoryCountEl = document.getElementById('auction-history-count');
 const auctionHistoryFilterEl = document.getElementById('auction-history-filter');
 const auctionHistoryFilterBidEl = document.getElementById('auction-history-filter-bid');
 const auctionHistoryFilterBuyNowEl = document.getElementById('auction-history-filter-buynow');
-const AUCTION_HISTORY_FETCH_LIMIT = 200;
 const AUCTION_SOLD_VIA_LABELS = { bid: '入札', buyNow: '即決購入' };
 // 取得済みの履歴をここに保持し、絞り込みはこの配列をその場でフィルターするだけ
 // (通信は発生しない。ユーザー一覧セクションと同じ方式)。
@@ -421,7 +424,6 @@ async function loadAuctionHistory() {
       collection(db, 'ukoMarketListings'),
       where('status', '==', 'sold'),
       orderBy('soldAt', 'desc'),
-      limit(AUCTION_HISTORY_FETCH_LIMIT),
     ));
     latestAuctionHistory = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAuctionHistory();
@@ -498,9 +500,7 @@ function renderAuctionHistory() {
   const pageRows = rows.slice(pageStart, pageStart + HISTORY_PAGE_SIZE);
 
   if (auctionHistoryCountEl) {
-    const totalLabel = latestAuctionHistory.length >= AUCTION_HISTORY_FETCH_LIMIT
-      ? `直近${AUCTION_HISTORY_FETCH_LIMIT}件中`
-      : `${latestAuctionHistory.length}件中`;
+    const totalLabel = `${latestAuctionHistory.length}件中`;
     auctionHistoryCountEl.textContent = rows.length === 0
       ? `${totalLabel}0件を表示`
       : `${totalLabel}${rows.length}件が該当（${pageStart + 1}〜${pageStart + pageRows.length}件目を表示、${auctionHistoryCurrentPage}/${totalPages}ページ）`;
