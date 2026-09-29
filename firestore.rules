@@ -256,11 +256,11 @@ service cloud.firestore {
           'status', 'turn', 'turnCount', 'changeStone', 'stones', 'startP',
           'winnerUid', 'resultType', 'p1CharaId', 'p2CharaId',
           'bo3Final', 'rated', 'finishedAt',
-          'zhongliBlocked', 'zhongliTurnsLeft', 'zhongliCasterColor',
-          'durinPending', 'durinCasterColor',
-          'cerluaActive', 'cerluaCasterColor',
-          'silverwolfMatchWinner'
+          'abilityState'
         ])
+        // キャラ固有の必殺技状態(鍾離の封鎖・ドゥリン・ケリュドラ・銀狼など)は abilityState マップ1つにまとめてある。
+        // 新しいキャラの状態を増やしてもルールの修正は不要。
+        && (!("abilityState" in request.resource.data) || request.resource.data.abilityState is map)
         && request.resource.data.player1_ID == resource.data.player1_ID
         && request.resource.data.player2_ID == resource.data.player2_ID
         && request.resource.data.player1_CharaID == resource.data.player1_CharaID
@@ -299,10 +299,12 @@ service cloud.firestore {
           )
         )
         && (!("winnerUid" in request.resource.data) || request.resource.data.winnerUid in [resource.data.player1_ID, resource.data.player2_ID])
+        // rated を true にできるのはサーバー(24_AccountCenter/functions/connect.js)だけ。
+        // クライアントは false の書き込み(決着の報告)か、変更しないことのみ許可。
         && (
-          !("rated" in resource.data)
-          || resource.data.rated == false
-          || resource.data.rated == request.resource.data.rated
+          !("rated" in request.resource.data)
+          || request.resource.data.rated == false
+          || ("rated" in resource.data && resource.data.rated == request.resource.data.rated)
         );
 
       allow delete: if request.auth != null
@@ -327,18 +329,13 @@ service cloud.firestore {
         && request.resource.data.matchCount == 0
         && request.resource.data.winCount == 0;
 
+      // 本人だけが更新できる。レート・戦績(rating/matchCount/winCount/charaWins/lastMatchAt)は
+      // サーバー(24_AccountCenter/functions/connect.js)だけが書き込み、クライアントからは変更不可。
+      // (以前は対戦相手のレートもクライアントが書いていたため、誰でも任意のユーザーのレートを変えられた)
       allow update: if request.auth != null
+        && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['rating', 'matchCount', 'winCount', 'lastMatchAt', 'charaWins', 'playerName', 'achievements', 'achievementCount', 'achStats', 'equippedTitles', 'unlockedHiddenCharas', 'unlockedHiddenCharaCount', 'sharedUserId'])
-        && request.resource.data.rating is int
-        && request.resource.data.rating >= 100
-        && request.resource.data.rating <= resource.data.rating + 48
-        && request.resource.data.rating >= resource.data.rating - 72
-        && request.resource.data.matchCount is int
-        && (request.resource.data.matchCount == resource.data.matchCount || request.resource.data.matchCount == resource.data.matchCount + 1)
-        && request.resource.data.winCount is int
-        && request.resource.data.winCount >= resource.data.winCount
-        && request.resource.data.winCount <= resource.data.winCount + 1
-        && (!("charaWins" in request.resource.data) || request.resource.data.charaWins is map)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'matchCount', 'winCount', 'charaWins', 'lastMatchAt'])
         && (!("playerName" in request.resource.data) || (request.resource.data.playerName is string && request.resource.data.playerName.size() <= 20))
         && (!("achievements" in request.resource.data) || request.resource.data.achievements is list)
         && (!("achievementCount" in request.resource.data) || (request.resource.data.achievementCount is int && request.resource.data.achievementCount >= 0 && request.resource.data.achievementCount <= 200))
@@ -348,22 +345,16 @@ service cloud.firestore {
     }
 
     // Connect10（コネバト）キャラ統計
+    // 書き込みはサーバー(Cloud Function)だけ
     match /connectCharaStats/{charaId} {
       allow read: if request.auth != null;
+      allow write: if false;
+    }
 
-      allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['pickCount', 'winCount'])
-        && request.resource.data.pickCount is int && request.resource.data.pickCount >= 0 && request.resource.data.pickCount <= 2
-        && request.resource.data.winCount is int && request.resource.data.winCount >= 0 && request.resource.data.winCount <= 1;
-
-      allow update: if request.auth != null
-        && request.resource.data.keys().hasOnly(['pickCount', 'winCount'])
-        && request.resource.data.pickCount is int
-        && request.resource.data.pickCount >= resource.data.pickCount
-        && request.resource.data.pickCount <= resource.data.pickCount + 2
-        && request.resource.data.winCount is int
-        && request.resource.data.winCount >= resource.data.winCount
-        && request.resource.data.winCount <= resource.data.winCount + 1;
+    // Connect10（コネバト）ランク戦の試合記録(バランス調整の集計用)。書き込みはサーバー(Cloud Function)だけ。
+    match /connectMatches/{matchId} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
 
     // GenshinOmikuji みんなの結果フィード（24時間以内の占い結果一覧。匿名運用のためomikujiUsersと同じくオープン）

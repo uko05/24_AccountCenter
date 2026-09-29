@@ -153,3 +153,6 @@ exports.cleanupRemovedImage = onDocumentUpdated(`${IMAGES_COLLECTION}/{imageId}`
   if (!after.ownerUid) return;
   await deleteImageFiles(admin.storage().bucket().name, after.ownerUid, event.params.imageId);
 });
+
+// 10_connect(コネバト)のランク戦レート計算(詳細は connect.js 冒頭)
+Object.assign(exports, require('./connect'));
