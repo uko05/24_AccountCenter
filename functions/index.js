@@ -159,3 +159,6 @@ Object.assign(exports, require('./connect'));
 
 // うーこオークションの同時出品数の上限(詳細は auctionLimit.js 冒頭)
 Object.assign(exports, require('./auctionLimit'));
+
+// 27_ArcanaTrade(原神アルカナ交換所)の承認・交換完了・取り消し(詳細は arcanaTrade.js 冒頭)
+Object.assign(exports, require('./arcanaTrade'));

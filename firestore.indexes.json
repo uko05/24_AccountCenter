@@ -87,6 +87,39 @@
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "soldAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "arcanaTradeProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "server", "order": "ASCENDING" },
+        { "fieldPath": "lastActiveAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "arcanaTradeProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "server", "order": "ASCENDING" },
+        { "fieldPath": "spare", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "lastActiveAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "arcanaTradeRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "approvedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "arcanaTradeRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

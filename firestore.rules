@@ -530,6 +530,76 @@ service cloud.firestore {
         && request.resource.data.moderationStatus in ['approved', 'removed'];
     }
 
+    // ===== 27_ArcanaTrade(原神アルカナ交換所, 2026-10-02追加) =====
+    // 登録・申請はアカウント登録(ログイン)必須。さがす一覧は未登録でも見られるようプロフィールは公開。
+    // 承認・交換完了・取り消しは Cloud Functions(functions/arcanaTrade.js)だけが行う
+    // (同じカードへの申請が重なっても出せる枚数を超えないよう、サーバー側で確かめるため)。
+    function isArcanaCounts(m) {
+      return m is map && m.size() <= 22;
+    }
+    // 公開プロフィール。reservedOut(交換予定の枚数)はサーバーだけが書く
+    match /arcanaTradeProfiles/{userId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && userId == myOmikujiId()
+        && request.resource.data.userId == userId
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 20
+        && request.resource.data.server in ['asia', 'america', 'europe', 'sar']
+        && isArcanaCounts(request.resource.data.counts)
+        && request.resource.data.spare is list && request.resource.data.spare.size() <= 22
+        && (!('reservedOut' in request.resource.data) || request.resource.data.reservedOut.size() == 0);
+      allow update: if request.auth != null
+        && userId == myOmikujiId()
+        && request.resource.data.userId == userId
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 20
+        && request.resource.data.server in ['asia', 'america', 'europe', 'sar']
+        && isArcanaCounts(request.resource.data.counts)
+        && request.resource.data.spare is list && request.resource.data.spare.size() <= 22
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['reservedOut']);
+      allow delete: if false;
+    }
+    // 原神UID。本人だけが読み書きできる(承認されたときにサーバーが申請へ写す)
+    match /arcanaTradePrivate/{userId} {
+      allow read: if request.auth != null && userId == myOmikujiId();
+      allow create, update: if request.auth != null && userId == myOmikujiId()
+        && request.resource.data.genshinUid is string && request.resource.data.genshinUid.size() <= 12;
+    }
+    // 交換申請。当事者だけが読める
+    match /arcanaTradeRequests/{requestId} {
+      allow read: if request.auth != null
+        && (resource.data.ownerId == myOmikujiId() || resource.data.applicantId == myOmikujiId());
+      allow create: if request.auth != null
+        && request.resource.data.applicantId == myOmikujiId()
+        && request.resource.data.ownerId is string
+        && request.resource.data.ownerId != request.resource.data.applicantId
+        && request.resource.data.status == 'pending'
+        && request.resource.data.getCard is string && request.resource.data.giveCard is string
+        && request.resource.data.getCard != request.resource.data.giveCard
+        && request.resource.data.message is string && request.resource.data.message.size() <= 100
+        && request.resource.data.chatMessages.size() == 0
+        && !('revealed' in request.resource.data);
+      // 申請を受けた人がお断りする
+      allow update: if request.auth != null
+        && resource.data.ownerId == myOmikujiId()
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'declined'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'respondedAt']);
+      // 承認後のチャット(1件の交換で1人5回まで、合計10件)と既読フラグ
+      allow update: if request.auth != null
+        && (resource.data.ownerId == myOmikujiId() || resource.data.applicantId == myOmikujiId())
+        && resource.data.status in ['approved', 'completed']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['chatMessages', 'ownerSeen', 'applicantSeen'])
+        && request.resource.data.chatMessages.size() <= 10;
+      // 既読フラグだけ(承認待ちの間も)
+      allow update: if request.auth != null
+        && (resource.data.ownerId == myOmikujiId() || resource.data.applicantId == myOmikujiId())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ownerSeen', 'applicantSeen']);
+      // 申請者が承認前に取り下げる
+      allow delete: if request.auth != null
+        && resource.data.applicantId == myOmikujiId()
+        && resource.data.status == 'pending';
+    }
+
     // その他すべて拒否
     match /{document=**} {
       allow read, write: if false;
