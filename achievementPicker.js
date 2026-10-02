@@ -262,7 +262,7 @@ function initAchievementPicker() {
 
   onSnapshot(doc(db, 'sharedUserRoles', sharedId), (snap) => {
     const role = snap.exists() ? snap.data().role : null;
-    hasPointExchangeAccess = role === 'admin' || role === 'debugger';
+    hasPointExchangeAccess = role === 'admin'; // デバッガーはコネクトバトル専用(2026-10-02)
     renderPicker();
   }, (e) => console.error('[achievementPicker] role listen failed', e));
 

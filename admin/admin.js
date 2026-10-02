@@ -2029,7 +2029,6 @@ async function openEditor(uid, data, account = null) {
   const roleData = roleSnap.exists() ? roleSnap.data() : {};
   setRadioValue('edit-role', roleData.role || 'general');
   document.getElementById('edit-debug-connect').checked = !!roleData.debugConnect;
-  document.getElementById('edit-debug-omikuji').checked = !!roleData.debugOmikuji;
   updateRoleDebugOptionsVisibility();
 
   editSection.classList.remove('hidden');
@@ -2272,7 +2271,6 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
 
   const role = getRadioValue('edit-role') || 'general';
   const debugConnect = document.getElementById('edit-debug-connect').checked;
-  const debugOmikuji = document.getElementById('edit-debug-omikuji').checked;
 
   const connect10Achievements = Array.from(
     document.querySelectorAll('#edit-connect10-achievements input[type="checkbox"]:checked'),
@@ -2283,7 +2281,7 @@ document.getElementById('save-edit-btn').addEventListener('click', async () => {
     await setDoc(doc(db, 'sharedUserRoles', currentEditUid), {
       role,
       debugConnect: role === 'debugger' && debugConnect,
-      debugOmikuji: role === 'debugger' && debugOmikuji,
+      debugOmikuji: false, // おみくじのデバッガー設定は廃止(2026-10-02、デバッガーはコネクトバトル専用)
       updatedAt: serverTimestamp(),
     });
     if (role === 'debugger' && debugConnect) {
