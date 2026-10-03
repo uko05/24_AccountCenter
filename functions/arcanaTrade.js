@@ -4,7 +4,8 @@
 // 2人が同時に承認ボタンを押しておかしな状態になったりしないよう、トランザクションで確かめるため。
 //
 // 枚数のルール(27_ArcanaTrade/arcana.js と同じ):
-//   交換に出せる枚数 = 所持数(counts) - 1(必ず手元に残す) - 交換予定(reservedOut: 承認済み・未完了で出す予定の枚数)
+//   交換に出せる枚数 = 所持数(counts) - 残す枚数 - 交換予定(reservedOut: 承認済み・未完了で出す予定の枚数)
+//   残す枚数は通常1枚。「1枚所持も交換候補に出す」(allowLastCopy)をオンにした人は0枚
 //
 // 申請(arcanaTradeRequests)の項目:
 //   ownerId(申請を受けた人) / applicantId(申請した人)
@@ -30,7 +31,8 @@ const privateRef = (id) => db().collection('arcanaTradePrivate').doc(id);
 const reqCol = () => db().collection('arcanaTradeRequests');
 
 function tradeable(p, id) {
-  return Math.max(0, ((p && p.counts && p.counts[id]) || 0) - 1 - ((p && p.reservedOut && p.reservedOut[id]) || 0));
+  const keep = p && p.allowLastCopy ? 0 : 1;
+  return Math.max(0, ((p && p.counts && p.counts[id]) || 0) - keep - ((p && p.reservedOut && p.reservedOut[id]) || 0));
 }
 function spareOf(p) {
   return ARCANA_IDS.filter((id) => tradeable(p, id) >= 1);
