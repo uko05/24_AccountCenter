@@ -30,7 +30,7 @@ const i18n = {
     uidTitle: '現在のUID',
     uidDesc: 'この端末でおみくじサイトなどを使うと自動的に発行されるIDです。通常はこの値を覚えておく必要はありません。',
     uidLoading: '読み込み中…',
-    uidNone: 'この端末ではまだ発行されていません（おみくじサイトを一度開くと発行されます）',
+    uidNone: 'この端末ではまだ発行されていません（登録するか、うーこの部屋のサイトを使うと自動で発行されます）',
     linkModeTitle: '他サイトへのリンクの開き方',
     linkModeDesc: 'うーこの部屋の他のサイト（メニューのリンクなど）を新しいタブで開くか、同じタブで開くか選べます。登録不要でこの端末・IDに反映されます。',
     linkModeNewTab: '新しいタブで開く（既定）',
@@ -86,7 +86,7 @@ const i18n = {
     uidTitle: 'Your current UID',
     uidDesc: 'This ID is issued automatically on this device when you use a site like the omikuji. You usually do not need to remember it.',
     uidLoading: 'Loading…',
-    uidNone: 'Not issued on this device yet (visit the omikuji site once to get one).',
+    uidNone: 'Not issued on this device yet (it is issued automatically when you register or use one of the sites).',
     linkModeTitle: 'How links to other sites open',
     linkModeDesc: 'Choose whether links to other うーこの部屋 sites (like the menu) open in a new tab or the same tab. No registration needed — this applies to this device/ID.',
     linkModeNewTab: 'Open in a new tab (default)',
@@ -174,6 +174,21 @@ function getCurrentOmikujiUid() {
   return localStorage.getItem(LS_OMIKUJI_UID) || '';
 }
 
+// 共有IDがまだこの端末に無ければ、ここで発行する(2026-10-04)。以前は「先におみくじサイトを
+// 一度使ってから」と案内していたが、IDの形式は各サイト共通(14_GenshinOmikuji/userData.js と同じ)
+// なので、アカウント管理で発行しても同じように使える
+function ensureOmikujiUid() {
+  let id = getCurrentOmikujiUid();
+  if (!id) {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    id = 'u_' + Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    localStorage.setItem(LS_OMIKUJI_UID, id);
+    uidBox.textContent = id;
+  }
+  return id;
+}
+
 function toAuthEmail(loginId) {
   return `${loginId.trim()}${AUTH_EMAIL_SUFFIX}`;
 }
@@ -231,11 +246,7 @@ async function loadLinkModePref() {
 
 linkModeRadios.forEach((radio) => {
   radio.addEventListener('change', async () => {
-    const uidNow = getCurrentOmikujiUid();
-    if (!uidNow) {
-      showMsg(linkModeMsg, t('msgNeedOmikujiFirst'), true);
-      return;
-    }
+    const uidNow = ensureOmikujiUid();
     const mode = radio.value;
     try {
       await setDoc(doc(db, 'omikujiUsers', uidNow), { linkOpenMode: mode }, { merge: true });
@@ -263,11 +274,7 @@ registerForm.addEventListener('submit', async (e) => {
 
   if (!id || !pw) { showMsg(registerMsg, t('msgFillIdPw'), true); return; }
 
-  const uidNow = getCurrentOmikujiUid();
-  if (!uidNow) {
-    showMsg(registerMsg, t('msgNeedOmikujiFirst'), true);
-    return;
-  }
+  const uidNow = ensureOmikujiUid();
 
   registerBtn.disabled = true;
   try {
@@ -330,11 +337,7 @@ mergeBtn.addEventListener('click', async () => {
 
   if (!name || !birthday) { showMsg(mergeMsg, t('msgFillMerge'), true); return; }
 
-  const uidNow = getCurrentOmikujiUid();
-  if (!uidNow) {
-    showMsg(mergeMsg, t('msgNeedOmikujiFirstMerge'), true);
-    return;
-  }
+  const uidNow = ensureOmikujiUid();
 
   mergeBtn.disabled = true;
   try {
