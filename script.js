@@ -284,10 +284,9 @@ registerForm.addEventListener('submit', async (e) => {
       loginId: id,
       createdAt: serverTimestamp(),
     });
-    // createUserWithEmailAndPassword の時点でログイン状態になっている。ログインした時と同じ表示にする
+    // createUserWithEmailAndPassword の時点でログイン状態になっている
     // (onAuthStateChanged は accountLinks を書く前に発火するので、アイコン設定などはここで読み直す)
     showMsg(registerMsg, t('msgRegisterOk'), false);
-    document.getElementById('register-success-links').classList.remove('hidden');
     uidBox.textContent = uidNow;
     loadAvatarSection(cred.user.uid);
     await offerSaveCredential(id, pw);
@@ -302,7 +301,6 @@ registerForm.addEventListener('submit', async (e) => {
 const loginForm = document.getElementById('login-form');
 const loginBtn = document.getElementById('login-btn');
 const loginMsg = document.getElementById('login-msg');
-const loginSuccessLinks = document.getElementById('login-success-links');
 
 loginForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -320,7 +318,6 @@ loginForm.addEventListener('submit', async (e) => {
       localStorage.setItem(LS_OMIKUJI_UID, linkSnap.data().omikujiUserId);
       uidBox.textContent = linkSnap.data().omikujiUserId;
       showMsg(loginMsg, t('msgLoginOk'), false);
-      loginSuccessLinks.classList.remove('hidden');
       await offerSaveCredential(id, pw);
     } else {
       showMsg(loginMsg, t('msgLoginNoLink'), true);
