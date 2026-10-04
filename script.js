@@ -65,7 +65,7 @@ const i18n = {
 
     msgFillIdPw: 'IDとパスワードを入力してください。',
     msgNeedOmikujiFirst: '先におみくじサイトを一度使ってから登録してください。',
-    msgRegisterOk: '登録が完了しました。この端末には今まで通りのデータが残っています。',
+    msgRegisterOk: '登録が完了し、そのままログインしました。この端末には今まで通りのデータが残っています。',
     msgLoginOk: 'ログインしました。この端末に今までのデータを引き継ぎました。',
     msgLoginNoLink: 'ログインは成功しましたが、紐づくデータが見つかりませんでした。お手数ですが連絡してください。',
     msgFillMerge: '名前と誕生日を入力してください。',
@@ -121,7 +121,7 @@ const i18n = {
 
     msgFillIdPw: 'Please enter an ID and password.',
     msgNeedOmikujiFirst: 'Please use the omikuji site once before registering.',
-    msgRegisterOk: 'Registration complete. Your data on this device is unchanged.',
+    msgRegisterOk: 'Registration complete — you are now logged in. Your data on this device is unchanged.',
     msgLoginOk: 'Logged in. Your data has been transferred to this device.',
     msgLoginNoLink: 'Login succeeded, but no linked data was found. Please contact us.',
     msgFillMerge: 'Please enter your name and birthday.',
@@ -284,7 +284,12 @@ registerForm.addEventListener('submit', async (e) => {
       loginId: id,
       createdAt: serverTimestamp(),
     });
+    // createUserWithEmailAndPassword の時点でログイン状態になっている。ログインした時と同じ表示にする
+    // (onAuthStateChanged は accountLinks を書く前に発火するので、アイコン設定などはここで読み直す)
     showMsg(registerMsg, t('msgRegisterOk'), false);
+    document.getElementById('register-success-links').classList.remove('hidden');
+    uidBox.textContent = uidNow;
+    loadAvatarSection(cred.user.uid);
     await offerSaveCredential(id, pw);
   } catch (e) {
     showMsg(registerMsg, authErrorMessage(e), true);
