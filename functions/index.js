@@ -162,3 +162,6 @@ Object.assign(exports, require('./auctionLimit'));
 
 // 27_ArcanaTrade(原神アルカナ交換所)の承認・交換完了・取り消し(詳細は arcanaTrade.js 冒頭)
 Object.assign(exports, require('./arcanaTrade'));
+
+// うーこオークションの期限切れ出品の精算(詳細は auctionSettle.js 冒頭)
+Object.assign(exports, require('./auctionSettle'));
