@@ -101,11 +101,14 @@
 
 
   <section class="section" id="merge-section">
-    <div class="section-title" data-i18n="mergeTitle">機種変した方はこちら</div>
-    <p class="section-desc" data-i18n="mergeDesc">
-      登録せずに占っていた方向けの引き継ぎ申請です。おみくじを引いた際に入力した「名前」「誕生日」を入力してください。
-      管理者が確認のうえ、この端末に今までのデータを引き継ぎます（すぐには反映されません）。
-    </p>
+    <div class="section-title" data-i18n="mergeTitle">アカウント未登録のまま機種変した方へ</div>
+    <p class="section-desc" style="white-space:pre-line;" data-i18n="mergeDesc">アカウント登録している方は、上の「ログイン」からIDとパスワードでログインするだけで引き継げます（申請は不要です）。
+
+登録しないまま機種変・ブラウザの変更などをした方は、ここから引き継ぎを申請できます。原神おみくじで入力していた「名前」と「誕生日」を入力してください。管理者が確認したうえで、この端末にデータを引き継ぎます（すぐには反映されません）。
+
+引き継げるのは、原神おみくじのデータ（占いの記録・UP・裏面デザイン・アチーブメントなど）です。フレンド承認板などほかのサイトのデータは引き継げません。
+
+引き継ぎが終わったら、次に備えてアカウント登録しておくのがおすすめです。</p>
     <div class="input-group">
       <label for="merge-name" data-i18n="labelMergeName">おみくじ時に入力した名前</label>
       <input type="text" id="merge-name" maxlength="20">
@@ -117,9 +120,7 @@
     <button id="merge-btn" class="primary-btn" data-i18n="mergeBtn">申請する</button>
     <p id="merge-msg" class="form-msg"></p>
 
-    <p class="section-desc" style="margin-top:16px;" data-i18n="mergeContactDesc">
-      名前を入力せずに占っていた方・上記が当てはまらない方は、下のリンクから直接連絡してください。
-    </p>
+    <p class="section-desc" style="margin-top:16px;" data-i18n="mergeContactDesc">原神おみくじで名前を入力していなかった方や、うまく申請できない方は、下のX（Twitter）かDiscordからご連絡ください。</p>
     <div class="contact-links">
       <a href="https://x.com/uko_dayo_" target="_blank" rel="noopener">
         <img src="https://cdn.jsdelivr.net/gh/uko05/99_SharedImage@main/00_common/footer_icon/twitter_image.png" alt="Twitter">
