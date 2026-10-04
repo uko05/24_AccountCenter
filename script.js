@@ -38,6 +38,8 @@ const i18n = {
     linkModeSaveOk: '設定しました。',
     linkModeSaveFail: '設定に失敗しました。時間をおいて再度お試しください。',
     registerTitle: 'アカウント登録（任意）',
+    authTitle: 'ログイン・アカウント登録（任意）',
+    registerTabTitle: '新規登録',
     registerDesc: 'ID・パスワードを設定すると、機種変した際もログインするだけで今までのデータを引き継げます。登録しなくても今まで通り使えます。',
     labelId: 'ID',
     labelPassword: 'パスワード',
@@ -94,6 +96,8 @@ const i18n = {
     linkModeSaveOk: 'Saved.',
     linkModeSaveFail: 'Failed to save. Please try again later.',
     registerTitle: 'Register an account (optional)',
+    authTitle: 'Log in / Register (optional)',
+    registerTabTitle: 'Register',
     registerDesc: 'Set an ID and password to keep your data even after switching devices — just log in on the new device. Everything still works fine without registering.',
     labelId: 'ID',
     labelPassword: 'Password',
@@ -261,6 +265,15 @@ linkModeRadios.forEach((radio) => {
 });
 
 loadLinkModePref();
+
+// ===== ログイン・新規登録のタブ(2026-10-04、1つのグループにまとめた) =====
+document.querySelectorAll('[data-auth-tab]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.authTab;
+    document.querySelectorAll('[data-auth-tab]').forEach((b) => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('[data-auth-panel]').forEach((p) => p.classList.toggle('hidden', p.dataset.authPanel !== tab));
+  });
+});
 
 // ===== 登録 =====
 const registerForm = document.getElementById('register-form');
