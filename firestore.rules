@@ -600,6 +600,14 @@ service cloud.firestore {
         && resource.data.status == 'pending';
     }
 
+    // 読み取り件数の集計(2026-10-07、一時的な調査用。各サイトの fsTracked.js が書く)。
+    // 件数を足すだけなので誰でも書けるが、項目は c(集計)と updatedAt だけ。読めるのは管理者だけ
+    match /readStats/{day} {
+      allow read: if isAdmin();
+      allow create, update: if request.resource.data.keys().hasOnly(['c', 'updatedAt'])
+        && request.resource.data.c is map && request.resource.data.c.size() <= 500;
+    }
+
     // その他すべて拒否
     match /{document=**} {
       allow read, write: if false;
