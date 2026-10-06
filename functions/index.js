@@ -166,5 +166,3 @@ Object.assign(exports, require('./arcanaTrade'));
 // うーこオークションの期限切れ出品の精算(詳細は auctionSettle.js 冒頭)
 Object.assign(exports, require('./auctionSettle'));
 
-// 原神おみくじのいいね通知を24時間で消す(詳細は likeNotifCleanup.js 冒頭)
-Object.assign(exports, require('./likeNotifCleanup'));
