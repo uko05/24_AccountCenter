@@ -4,7 +4,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, collectionGroup, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp,
+  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, collectionGroup, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp, getCountFromServer,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // 一覧は件数無制限で全件取得し、表示だけこの件数単位でページ分割する
@@ -1859,33 +1859,41 @@ function latestCampaignOfType(type) {
   const pool = active.length ? active : matches;
   return pool.reduce((best, c) => ((c.startsAt?.toMillis?.() || 0) > (best.startsAt?.toMillis?.() || 0) ? c : best));
 }
-async function renderUpEarningsBreakdown(uid, totalLikesReceived) {
+// withLikeUp=false(既定、2026-10-08): いいねは件数だけ数える(getCountFromServer、読み取りほぼなし)。
+// いいねの多い人は全件で数万件あり、1人開くだけで数万件の読み取りになっていたため。
+// UP合計は「いいねのUPを集計する」ボタン(withLikeUp=true)を押した時だけ全件を読んで出す。
+async function renderUpEarningsBreakdown(uid, totalLikesReceived, withLikeUp = false) {
   const container = document.getElementById('edit-up-earnings');
   if (!container) return;
   container.textContent = '読み込み中…';
 
   try {
-    const [givenSnap, receivedSnap, logSnap] = await Promise.all([
-      getDocs(query(collectionGroup(db, 'likes'), where('likerUserId', '==', uid))),
-      getDocs(query(collectionGroup(db, 'likes'), where('receiverUserId', '==', uid))),
-      getDocs(query(collection(db, 'ukoPointsLog'), where('userId', '==', uid))),
-    ]);
+    const givenQ = query(collectionGroup(db, 'likes'), where('likerUserId', '==', uid));
+    const receivedQ = query(collectionGroup(db, 'likes'), where('receiverUserId', '==', uid));
+    const logSnap = await getDocs(query(collection(db, 'ukoPointsLog'), where('userId', '==', uid)));
 
-    // あげいいね: likerUserIdは最初から全いいねドキュメントにあるので、件数・合計とも
-    // 正確(giveAmount未設定=2026-09-19のブースト機能より前のいいねは基準値1UPとみなす)。
-    let givenUp = 0;
-    givenSnap.docs.forEach((d) => { givenUp += d.data().giveAmount ?? 1; });
-    const givenCount = givenSnap.size;
+    let givenCount, givenUp = null, receivedTaggedCount, receivedUpTagged = null;
+    if (withLikeUp) {
+      const [givenSnap, receivedSnap] = await Promise.all([getDocs(givenQ), getDocs(receivedQ)]);
+      // あげいいね: giveAmount未設定=2026-09-19のブースト機能より前のいいねは基準値1UPとみなす
+      givenUp = 0;
+      givenSnap.docs.forEach((d) => { givenUp += d.data().giveAmount ?? 1; });
+      givenCount = givenSnap.size;
+      receivedUpTagged = 0;
+      receivedSnap.docs.forEach((d) => { receivedUpTagged += d.data().receiveAmount ?? 2; });
+      receivedTaggedCount = receivedSnap.size;
+    } else {
+      const [g, r] = await Promise.all([getCountFromServer(givenQ), getCountFromServer(receivedQ)]);
+      givenCount = g.data().count;
+      receivedTaggedCount = r.data().count;
+    }
 
     // もらいいね: receiverUserIdは2026-09-19に追加したフィールドなので、それより前の
     // いいねには付いていない。そちらはtotalLikesReceived(ユーザードキュメントの
     // 累計カウンター)との差分で件数を逆算し、ブースト機能が無かった時代=基準値2UP
     // 確定として合算する(推測ではなく、ブースト自体が存在しなかった期間なので確定できる)。
-    let receivedUpTagged = 0;
-    receivedSnap.docs.forEach((d) => { receivedUpTagged += d.data().receiveAmount ?? 2; });
-    const receivedTaggedCount = receivedSnap.size;
     const legacyReceivedCount = Math.max(0, (totalLikesReceived || 0) - receivedTaggedCount);
-    const receivedUp = receivedUpTagged + legacyReceivedCount * 2;
+    const receivedUp = receivedUpTagged === null ? null : receivedUpTagged + legacyReceivedCount * 2;
     const receivedCount = receivedTaggedCount + legacyReceivedCount;
 
     // オークション・ミッション: ukoPointsLog(種類ごとに件数・合計を集計するだけ)。
@@ -1921,13 +1929,14 @@ async function renderUpEarningsBreakdown(uid, totalLikesReceived) {
       const thisTime = (t && latest) ? (t.byCampaignId.get(latest.id) || 0) : 0;
       return { label, thisTime, cumulative: t?.cumulative || 0 };
     });
-    const grandTotal = rows.reduce((sum, r) => sum + r.totalUp, 0)
+    const likeUpKnown = givenUp !== null;
+    const grandTotal = rows.reduce((sum, r) => sum + (r.totalUp || 0), 0)
       + campaignRows.reduce((sum, r) => sum + r.cumulative, 0);
 
     container.innerHTML = rows.map((r) => `
       <div style="display:flex; justify-content:space-between; gap:10px;">
         <span>${escapeHtml(r.label)}${r.count > 0 ? `（${r.count}件）` : ''}</span>
-        <span>+${r.totalUp}UP</span>
+        <span>${r.totalUp === null ? '（UPは未集計）' : `+${r.totalUp}UP`}</span>
       </div>
     `).join('') + campaignRows.map((r) => `
       <div style="display:flex; justify-content:space-between; gap:10px;">
@@ -1936,10 +1945,15 @@ async function renderUpEarningsBreakdown(uid, totalLikesReceived) {
       </div>
     `).join('') + `
       <div style="display:flex; justify-content:space-between; gap:10px; margin-top:4px; padding-top:4px; border-top:1px solid var(--border); font-weight:bold;">
-        <span>獲得合計（消費分は含まない目安）</span>
+        <span>獲得合計（消費分は含まない目安）${likeUpKnown ? '' : '※いいね分を除く'}</span>
         <span>+${grandTotal}UP</span>
       </div>
-    `;
+    ` + (likeUpKnown ? '' : `
+      <button type="button" class="secondary-btn" id="edit-like-up-btn" style="margin-top:6px;">いいねのUPを集計する（読み取り多め）</button>
+    `);
+    document.getElementById('edit-like-up-btn')?.addEventListener('click', () => {
+      renderUpEarningsBreakdown(uid, totalLikesReceived, true);
+    });
   } catch (e) {
     console.error('[admin] up earnings breakdown load failed', e);
     container.textContent = '読み込みに失敗しました。';
