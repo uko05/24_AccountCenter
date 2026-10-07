@@ -13,7 +13,7 @@ const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const admin = require('firebase-admin');
 
 // 14_GenshinOmikuji/auction.js の MAX_ACTIVE_LISTINGS_PER_USER と同じ値にすること
-const MAX_ACTIVE_LISTINGS_PER_USER = 50;
+const MAX_ACTIVE_LISTINGS_PER_USER = 30; // 2026-10-07に50→30
 
 exports.enforceAuctionListingLimit = onDocumentCreated('ukoMarketListings/{listingId}', async (event) => {
   const listing = event.data && event.data.data();
