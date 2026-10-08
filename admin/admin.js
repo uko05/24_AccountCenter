@@ -4,8 +4,9 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, updatePassword,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, collectionGroup, query, where, orderBy, limit, getDocs, serverTimestamp, Timestamp, getCountFromServer,
+  doc, setDoc, addDoc, updateDoc, deleteDoc, deleteField, collection, collectionGroup, query, where, orderBy, limit, serverTimestamp, Timestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getDoc, getDocs, getCountFromServer } from './fsTracked.js'; // 読み取り件数の集計(調査用、fsTracked.js参照)
 
 // 一覧は件数無制限で全件取得し、表示だけこの件数単位でページ分割する
 // (1ページに全件出すと縦に長くなりすぎるため)。

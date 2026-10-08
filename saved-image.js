@@ -37,8 +37,9 @@
 import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, getDoc, serverTimestamp,
+  getFirestore, doc, setDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getDoc } from './fsTracked.js'; // 読み取り件数の集計(調査用、fsTracked.js参照)
 import {
   getStorage, ref, uploadBytes, getDownloadURL,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
