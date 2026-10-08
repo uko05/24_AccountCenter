@@ -17,12 +17,12 @@ const ACCOUNTS_PAGE_SIZE = 30;
 const HISTORY_PAGE_SIZE = 30;
 import { ACHIEVEMENT_GROUPS, ALL_ACHIEVEMENTS } from "https://uko05.github.io/14_GenshinOmikuji/achievements.js";
 import { ACHIEVEMENT_GROUPS as CONNECT10_ACHIEVEMENT_GROUPS } from "https://uko05.github.io/10_connect/public/scripts/achievements.js";
-import { GACHA_DESIGNS } from "https://uko05.github.io/14_GenshinOmikuji/gachaBacks.js";
+import { ALL_CARD_DESIGNS } from "https://uko05.github.io/14_GenshinOmikuji/gachaBacks.js?v=10"; // 原神+スタレ裏面
 import { VISIBILITY_FIELDS, fieldLabel, formatFieldValue } from "https://uko05.github.io/25_FriendBoard/fields.js";
 import { formatSavedAt } from '../saved-image.js';
 
 const RARITY_BY_ID = new Map(ALL_ACHIEVEMENTS.map((a) => [a.id, a.rarity]));
-const GACHA_DESIGN_BY_ID = new Map(GACHA_DESIGNS.map((d) => [d.id, d]));
+const GACHA_DESIGN_BY_ID = new Map(ALL_CARD_DESIGNS.map((d) => [d.id, d]));
 
 // saved-image.js を使って画像を保存している「画像メーカー系」サイト一覧。
 // savedProfileImages/{sharedUserId} は { [siteId]: {url, updatedAt} } という

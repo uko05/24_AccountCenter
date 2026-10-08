@@ -20,13 +20,19 @@ exports.enforceAuctionListingLimit = onDocumentCreated('ukoMarketListings/{listi
   if (!listing || listing.status !== 'active' || !listing.sellerId) return;
 
   const db = admin.firestore();
-  const countSnap = await db.collection('ukoMarketListings')
-    .where('sellerId', '==', listing.sellerId)
-    .where('status', '==', 'active')
-    .count()
-    .get();
-  const activeCount = countSnap.data().count;
-  if (activeCount <= MAX_ACTIVE_LISTINGS_PER_USER) return;
+  // スタレ裏面(itemIdがsr_***、2026-10-09追加)は出品できない。古い画面などから出品されたら
+  // 件数に関係なく、すぐ売れ残り扱いにして本人に返す(14_GenshinOmikuji/gachaBacks.js参照)
+  const notListable = listing.siteKey === 'omikuji' && typeof listing.itemId === 'string' && listing.itemId.startsWith('sr_');
+  let activeCount = null;
+  if (!notListable) {
+    const countSnap = await db.collection('ukoMarketListings')
+      .where('sellerId', '==', listing.sellerId)
+      .where('status', '==', 'active')
+      .count()
+      .get();
+    activeCount = countSnap.data().count;
+    if (activeCount <= MAX_ACTIVE_LISTINGS_PER_USER) return;
+  }
 
   const ref = event.data.ref;
   await db.runTransaction(async (tx) => {
@@ -41,9 +47,9 @@ exports.enforceAuctionListingLimit = onDocumentCreated('ukoMarketListings/{listi
     }
     tx.update(ref, {
       status: 'unsold',
-      cancelledReason: 'activeLimit',
+      cancelledReason: notListable ? 'notListable' : 'activeLimit',
       cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   });
-  console.log('[enforceAuctionListingLimit] returned over-limit listing', event.params.listingId, listing.sellerId, activeCount);
+  console.log('[enforceAuctionListingLimit] returned', notListable ? 'not-listable' : 'over-limit', 'listing', event.params.listingId, listing.sellerId, activeCount);
 });
