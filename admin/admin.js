@@ -168,10 +168,10 @@ document.querySelectorAll('input[name="mail-target-type"]').forEach((r) => {
 });
 updateMailTargetVisibility();
 
-// ===== メールの受け取り期限（デフォルト1か月後、無期限も選べる） =====
+// ===== メールの受け取り期限（デフォルト1週間後、無期限も選べる。2026-10-09に1か月後から変更） =====
 function setDefaultMailExpireDate() {
   const d = new Date();
-  d.setMonth(d.getMonth() + 1);
+  d.setDate(d.getDate() + 7);
   const pad = (n) => String(n).padStart(2, '0');
   document.getElementById('mail-expire-date').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
