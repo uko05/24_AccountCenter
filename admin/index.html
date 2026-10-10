@@ -158,6 +158,29 @@
     </details>
   </section>
 
+  <section class="section" id="connect-pair-section">
+    <details id="connect-pair-details">
+      <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">コネクトバトル 対戦の偏り</summary>
+      <div style="margin-top:14px;">
+        <p class="section-desc">ランク戦の記録を、対戦した2人の組み合わせごとにまとめて表示します。サブアカウントを使った勝ち譲り（同じ相手とばかり対戦する・片方だけが勝ち続ける・切断や時間切れでの決着が多い）が無いか確認する用途です。⚠は目安で、仲の良い友だち同士のこともあります。</p>
+        <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin-bottom:10px;">
+          <label style="font-size:0.82rem;">期間
+            <select id="connect-pair-days">
+              <option value="7">直近7日</option>
+              <option value="30" selected>直近30日</option>
+              <option value="0">全期間</option>
+            </select>
+          </label>
+          <button id="reload-connect-pair-btn" class="secondary-btn">再読み込み</button>
+        </div>
+        <div id="connect-pair-summary" class="section-desc" style="margin:0 0 6px;"></div>
+        <div style="overflow-x:auto;"><div id="connect-pair-list"></div></div>
+        <div style="font-size:0.82rem; font-weight:bold; margin:14px 0 6px;">負けが同じ相手に偏っている人</div>
+        <div style="overflow-x:auto;"><div id="connect-loser-list"></div></div>
+      </div>
+    </details>
+  </section>
+
   <section class="section" id="up-log-history-section">
     <details id="up-log-history-details">
       <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">UP取得履歴（オークション・ミッション）</summary>
@@ -457,7 +480,7 @@
 
 <span id="site-version" class="site-version">v1.13</span>
 
-<script type="module" src="admin.js?v=34"></script>
+<script type="module" src="admin.js?v=35"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

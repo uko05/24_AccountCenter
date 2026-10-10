@@ -2367,3 +2367,143 @@ function enableThumbnailZoom(container) {
     img.addEventListener('click', () => openAdminLightbox(img.dataset.zoomable));
   });
 }
+
+// ===== コネクトバトル 対戦の偏り(2026-10-11追加) =====
+// サブアカウントを使った勝ち譲り対策。connectMatches(ランク戦1試合=1件、サーバーが記録)を
+// 2人の組み合わせごとにまとめ、同じ相手との対戦の多さ・勝ちの偏り・切断/時間切れ決着の多さを見る。
+// 名前はconnectUsers/{uid}.sharedUserId → omikujiUsers/{id}.name で引く(人数が少ないので個別に読む)。
+const connectPairListEl = document.getElementById('connect-pair-list');
+const connectLoserListEl = document.getElementById('connect-loser-list');
+const connectPairSummaryEl = document.getElementById('connect-pair-summary');
+let connectPairLoaded = false;
+const connectNameCache = new Map(); // connectのuid -> { name, sharedUserId }
+
+document.getElementById('connect-pair-details')?.addEventListener('toggle', function onToggle() {
+  if (this.open && !connectPairLoaded) { connectPairLoaded = true; loadConnectPairs(); }
+});
+document.getElementById('reload-connect-pair-btn')?.addEventListener('click', loadConnectPairs);
+document.getElementById('connect-pair-days')?.addEventListener('change', loadConnectPairs);
+
+async function connectPlayerInfo(uid) {
+  if (connectNameCache.has(uid)) return connectNameCache.get(uid);
+  let info = { name: uid.slice(0, 8), sharedUserId: null };
+  try {
+    const cSnap = await getDoc(doc(db, 'connectUsers', uid));
+    const sharedUserId = cSnap.exists() ? cSnap.data().sharedUserId : null;
+    if (sharedUserId) {
+      const oSnap = await getDoc(doc(db, 'omikujiUsers', sharedUserId));
+      const name = oSnap.exists() ? (oSnap.data().name || '') : '';
+      info = { name: name || `(名前なし)${sharedUserId.slice(0, 8)}`, sharedUserId };
+    }
+  } catch (e) { console.error('[admin] connect player lookup failed', uid, e); }
+  connectNameCache.set(uid, info);
+  return info;
+}
+
+async function loadConnectPairs() {
+  if (!connectPairListEl) return;
+  connectPairListEl.innerHTML = '読み込み中…';
+  if (connectLoserListEl) connectLoserListEl.innerHTML = '';
+  try {
+    const days = Number(document.getElementById('connect-pair-days')?.value || 30);
+    const q = days > 0
+      ? query(collection(db, 'connectMatches'), where('createdAt', '>=', Timestamp.fromMillis(Date.now() - days * 24 * 60 * 60 * 1000)))
+      : collection(db, 'connectMatches');
+    const snap = await getDocs(q);
+    const matches = snap.docs.map((d) => d.data()).filter((m) => m.p1Uid && m.p2Uid);
+
+    const pairs = new Map();
+    const losses = new Map(); // 負けた人 -> Map(勝った人 -> 回数)
+    matches.forEach((m) => {
+      const [a, b] = [m.p1Uid, m.p2Uid].sort();
+      const key = `${a}__${b}`;
+      const p = pairs.get(key) || { a, b, count: 0, winsA: 0, winsB: 0, rated: 0, quick: 0, lastMs: 0 };
+      p.count += 1;
+      if (m.winnerUid === a) p.winsA += 1;
+      if (m.winnerUid === b) p.winsB += 1;
+      if (m.rated) p.rated += 1;
+      if (m.resultType === 'leave' || m.resultType === 'timeout') p.quick += 1;
+      p.lastMs = Math.max(p.lastMs, m.createdAt?.toMillis?.() || 0);
+      pairs.set(key, p);
+      if (m.winnerUid) {
+        const loser = m.winnerUid === m.p1Uid ? m.p2Uid : m.p1Uid;
+        const lm = losses.get(loser) || new Map();
+        lm.set(m.winnerUid, (lm.get(m.winnerUid) || 0) + 1);
+        losses.set(loser, lm);
+      }
+    });
+
+    const uids = new Set();
+    pairs.forEach((p) => { uids.add(p.a); uids.add(p.b); });
+    await Promise.all([...uids].map(connectPlayerInfo));
+    const nameLink = (uid) => {
+      const info = connectNameCache.get(uid) || { name: uid.slice(0, 8) };
+      return info.sharedUserId
+        ? `<span class="admin-user-link" data-omikuji-id="${escapeHtml(info.sharedUserId)}" style="cursor:pointer; color:#2a6fdb; text-decoration:underline;">${escapeHtml(info.name)}</span>`
+        : escapeHtml(info.name);
+    };
+
+    // 目安: 同じ2人で6回以上 / 5回以上で片方が8割以上勝っている / 切断・時間切れ決着が3回以上
+    const rows = [...pairs.values()].map((p) => {
+      const flags = [];
+      if (p.count >= 6) flags.push('対戦が多い');
+      if (p.count >= 5 && Math.max(p.winsA, p.winsB) / p.count >= 0.8) flags.push('勝ちが片方に偏り');
+      if (p.quick >= 3) flags.push('切断・時間切れが多い');
+      return { ...p, flags };
+    }).sort((x, y) => (y.flags.length - x.flags.length) || (y.count - x.count));
+
+    if (connectPairSummaryEl) {
+      const flagged = rows.filter((r) => r.flags.length).length;
+      connectPairSummaryEl.textContent = `${matches.length}試合・${rows.length}組${flagged ? `（⚠ ${flagged}組）` : ''}`;
+    }
+    if (rows.length === 0) {
+      connectPairListEl.innerHTML = 'この期間のランク戦の記録はありません。';
+    } else {
+      const table = document.createElement('table');
+      table.className = 'user-table';
+      table.innerHTML = `<thead><tr>
+        <th style="white-space:nowrap;">プレイヤー1</th><th style="white-space:nowrap;">プレイヤー2</th>
+        <th style="white-space:nowrap;">対戦数</th><th style="white-space:nowrap;">勝敗</th>
+        <th style="white-space:nowrap;">レート対象</th><th style="white-space:nowrap;">切断・時間切れ</th>
+        <th style="white-space:nowrap;">最終対戦</th><th style="white-space:nowrap;">目安</th>
+      </tr></thead><tbody></tbody>`;
+      const tbody = table.querySelector('tbody');
+      rows.forEach((r) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td style="white-space:nowrap;">${nameLink(r.a)}</td>
+          <td style="white-space:nowrap;">${nameLink(r.b)}</td>
+          <td style="white-space:nowrap;">${r.count}回</td>
+          <td style="white-space:nowrap;">${r.winsA}勝 - ${r.winsB}勝</td>
+          <td style="white-space:nowrap;">${r.rated}回</td>
+          <td style="white-space:nowrap;">${r.quick}回</td>
+          <td style="white-space:nowrap;">${escapeHtml(fmtTimestamp(r.lastMs))}</td>
+          <td style="white-space:nowrap; color:#c0392b; font-weight:bold;">${r.flags.length ? '⚠ ' + escapeHtml(r.flags.join('・')) : ''}</td>`;
+        tbody.appendChild(tr);
+      });
+      connectPairListEl.innerHTML = '';
+      connectPairListEl.appendChild(table);
+    }
+
+    // 負けの6割以上が同じ相手(5敗以上)= 勝ち譲りの「負け役」の可能性
+    const loserRows = [];
+    losses.forEach((m, loser) => {
+      const total = [...m.values()].reduce((s, n) => s + n, 0);
+      const [top, n] = [...m.entries()].sort((x, y) => y[1] - x[1])[0];
+      if (total >= 5 && n / total >= 0.6) loserRows.push({ loser, top, n, total });
+    });
+    await Promise.all(loserRows.flatMap((r) => [connectPlayerInfo(r.loser), connectPlayerInfo(r.top)]));
+    if (connectLoserListEl) {
+      connectLoserListEl.innerHTML = loserRows.length === 0
+        ? '<p class="section-desc" style="margin:0;">該当なし</p>'
+        : loserRows.map((r) => `<div style="font-size:0.85rem; margin:4px 0;">⚠ ${nameLink(r.loser)} は負け${r.total}回のうち<b>${r.n}回</b>が ${nameLink(r.top)} への負け</div>`).join('');
+    }
+
+    [connectPairListEl, connectLoserListEl].forEach((el) => el?.querySelectorAll('[data-omikuji-id]').forEach((link) => {
+      link.addEventListener('click', () => openEditorByOmikujiId(link.dataset.omikujiId));
+    }));
+  } catch (e) {
+    console.error('[admin] connect pairs load failed', e);
+    connectPairListEl.innerHTML = '読み込みに失敗しました。';
+  }
+}
