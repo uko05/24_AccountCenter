@@ -778,6 +778,7 @@ const UP_LOG_TYPE_LABELS = {
   auctionCashback: '落札キャッシュバック',
   auctionListingBonus: '出品ボーナス',
   missionClaim: 'ミッション報酬',
+  adminPenalty: '管理者による差し引き', // サブアカウント対応などで管理者が減らした分(2026-10-10追加、金額はマイナス)
 };
 const upLogTypeFilterEls = Object.fromEntries(
   Object.keys(UP_LOG_TYPE_LABELS).map((type) => [type, document.getElementById(`up-log-history-filter-${type}`)])
@@ -825,6 +826,7 @@ async function loadUpLogHistory() {
 function upLogDetailText(d) {
   const meta = d.meta || {};
   if (d.type === 'missionClaim') return meta.claimKey || '';
+  if (d.type === 'adminPenalty') return meta.reason || '';
   return meta.itemName || meta.itemId || '';
 }
 
