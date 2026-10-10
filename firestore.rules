@@ -234,7 +234,7 @@ service cloud.firestore {
         && resource.data.status == "waiting"
         && resource.data.player2_ID == null
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(
-          ['player2_ID', 'player2_CharaID', 'player2_Name', 'status', 'player2_LastActive']
+          ['player2_ID', 'player2_CharaID', 'player2_Name', 'status', 'player2_LastActive', 'player2_StoneSkin']
         )
         && request.resource.data.player2_ID == request.auth.uid
         && request.resource.data.player1_ID == resource.data.player1_ID;
