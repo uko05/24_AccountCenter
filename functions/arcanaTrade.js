@@ -16,6 +16,7 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const { cleanupOldLikeNotifications } = require('./likeNotifCleanup');
+const { cleanupOldConnectRooms } = require('./connectRoomCleanup');
 
 const ARCANA_IDS = [
   'fool', 'magician', 'high_priestess', 'empress', 'emperor', 'hierophant', 'lovers', 'chariot',
@@ -201,12 +202,18 @@ exports.arcanaCancel = onCall({ region: 'asia-northeast1' }, async (request) => 
 });
 
 // ===== 定期処理: 承認から3日で自動的に交換完了 / 7日承認されない申請は取り下げ =====
-// ※原神おみくじのいいね通知の片付け(likeNotifCleanup.js)も、定期実行を増やさないようここで一緒に行う
+// ※原神おみくじのいいね通知の片付け(likeNotifCleanup.js)と、コネクトバトルの古い対戦部屋の片付け
+//   (connectRoomCleanup.js)も、定期実行を増やさないようここで一緒に行う
 exports.arcanaTradeSweep = onSchedule({ schedule: 'every 60 minutes', region: 'asia-northeast1', timeoutSeconds: 540 }, async () => {
   try {
     await cleanupOldLikeNotifications();
   } catch (e) {
     console.error('[arcanaTradeSweep] like notification cleanup failed', e);
+  }
+  try {
+    await cleanupOldConnectRooms();
+  } catch (e) {
+    console.error('[arcanaTradeSweep] connect room cleanup failed', e);
   }
   const now = Date.now();
   const due = await reqCol().where('status', '==', 'approved')
