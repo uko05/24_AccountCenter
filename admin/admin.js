@@ -778,6 +778,7 @@ const UP_LOG_TYPE_LABELS = {
   auctionCashback: '落札キャッシュバック',
   auctionListingBonus: '出品ボーナス',
   missionClaim: 'ミッション報酬',
+  cardSell: '裏面のまとめて売却', // おみくじのダブり売却(2026-10-14追加、1枚10UP)
   adminPenalty: '管理者による差し引き', // サブアカウント対応などで管理者が減らした分(2026-10-10追加、金額はマイナス)
 };
 const upLogTypeFilterEls = Object.fromEntries(
