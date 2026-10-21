@@ -337,7 +337,9 @@ service cloud.firestore {
       // (以前は対戦相手のレートもクライアントが書いていたため、誰でも任意のユーザーのレートを変えられた)
       allow update: if request.auth != null
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['rating', 'matchCount', 'winCount', 'lastMatchAt', 'charaWins', 'playerName', 'achievements', 'achievementCount', 'achStats', 'equippedTitles', 'unlockedHiddenCharas', 'unlockedHiddenCharaCount', 'sharedUserId', 'hubArtUnlocked'])
+        && request.resource.data.keys().hasOnly(['rating', 'matchCount', 'winCount', 'lastMatchAt', 'charaWins', 'playerName', 'achievements', 'achievementCount', 'achStats', 'equippedTitles', 'unlockedHiddenCharas', 'unlockedHiddenCharaCount', 'sharedUserId', 'hubArtUnlocked', 'challengeProgress'])
+        // challengeProgress: ソロの挑戦モードの進み具合(2026-10-22、10_connect/public/scripts/challengeManager.js)
+        && (!("challengeProgress" in request.resource.data) || request.resource.data.challengeProgress is map)
         // hubArtUnlocked: 原神おみくじで10枚集めた裏面のID(トップ画面に使える。2026-10-11)
         && (!("hubArtUnlocked" in request.resource.data) || (request.resource.data.hubArtUnlocked is list && request.resource.data.hubArtUnlocked.size() <= 1000))
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'matchCount', 'winCount', 'charaWins', 'lastMatchAt'])
