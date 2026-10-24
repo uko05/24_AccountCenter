@@ -286,9 +286,13 @@ service cloud.firestore {
         && request.resource.data.player2_TimeoutCount is int && request.resource.data.player2_TimeoutCount >= resource.data.player2_TimeoutCount && request.resource.data.player2_TimeoutCount <= resource.data.player2_TimeoutCount + 1
         // 決着(bo3Final)は、どちらかが3勝しているか、切断/時間切れ(leave/timeout)の時だけ書ける。
         // 切断・時間切れの妥当性(本当に相手が離脱/時間切れしたか)はサーバー(connectRateMatch)が確認する。
+        // 2026-10-25: 3勝目は決着と同じ書き込みで部屋に入る(最終ラウンドは勝ち数を先に書かない)ので、
+        // 書き込み後の値(request.resource)も見る。以前は書き込み前の値だけを見ていて、3点先取の決着が
+        // 毎回拒否され、普通に勝った試合にレートが付かなかった。勝ち数は1回に1ずつしか増やせない(上の条件)
         && (
           !("bo3Final" in request.resource.data) || request.resource.data.bo3Final != true
           || resource.data.red_Win == 3 || resource.data.yellow_Win == 3
+          || request.resource.data.red_Win == 3 || request.resource.data.yellow_Win == 3
           || request.resource.data.resultType in ['leave', 'timeout']
         )
         && (
