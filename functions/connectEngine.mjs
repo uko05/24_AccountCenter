@@ -662,7 +662,7 @@ export function replay({ seed, playerCharaID, cpuCharaID, playerColor, profile }
 
 // CPUのレートから強さを決める(2026-10-25 決定)
 export function profileForRating(rating) {
-    if (rating >= 2000) return { depth: 10, mistake: 0 };
+    if (rating >= 2000) return { depth: 8, mistake: 0 };
     if (rating >= 1800) return { depth: 6, mistake: 0 };
     if (rating >= 1600) return { depth: 5, mistake: 0 };
     if (rating >= 1450) return { depth: 4, mistake: 0.03 };
