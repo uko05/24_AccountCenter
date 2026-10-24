@@ -17,6 +17,7 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const { cleanupOldLikeNotifications } = require('./likeNotifCleanup');
 const { cleanupOldConnectRooms } = require('./connectRoomCleanup');
+const { settleAbandonedCpuMatches } = require('./connectCpu');
 
 const ARCANA_IDS = [
   'fool', 'magician', 'high_priestess', 'empress', 'emperor', 'hierophant', 'lovers', 'chariot',
@@ -212,6 +213,8 @@ exports.arcanaTradeSweep = onSchedule({ schedule: 'every 60 minutes', region: 'a
   }
   try {
     await cleanupOldConnectRooms();
+    // コネバトのCPU戦で、途中で閉じたまま30分たった対局を「退出の負け」にする(connectCpu.js)
+    try { await settleAbandonedCpuMatches(); } catch (e) { console.error('[connectCpu] settle failed', e); }
   } catch (e) {
     console.error('[arcanaTradeSweep] connect room cleanup failed', e);
   }

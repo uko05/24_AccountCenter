@@ -341,12 +341,13 @@ service cloud.firestore {
       // (以前は対戦相手のレートもクライアントが書いていたため、誰でも任意のユーザーのレートを変えられた)
       allow update: if request.auth != null
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['rating', 'matchCount', 'winCount', 'lastMatchAt', 'charaWins', 'playerName', 'achievements', 'achievementCount', 'achStats', 'equippedTitles', 'unlockedHiddenCharas', 'unlockedHiddenCharaCount', 'sharedUserId', 'hubArtUnlocked', 'challengeProgress'])
+        && request.resource.data.keys().hasOnly(['rating', 'matchCount', 'winCount', 'lastMatchAt', 'charaWins', 'playerName', 'achievements', 'achievementCount', 'achStats', 'equippedTitles', 'unlockedHiddenCharas', 'unlockedHiddenCharaCount', 'sharedUserId', 'hubArtUnlocked', 'challengeProgress', 'cpuMatch'])
+        // cpuMatch: レート戦のCPU戦の内容(2026-10-25、functions/connectCpu.js)。サーバーだけが書く
         // challengeProgress: ソロの挑戦モードの進み具合(2026-10-22、10_connect/public/scripts/challengeManager.js)
         && (!("challengeProgress" in request.resource.data) || request.resource.data.challengeProgress is map)
         // hubArtUnlocked: 原神おみくじで10枚集めた裏面のID(トップ画面に使える。2026-10-11)
         && (!("hubArtUnlocked" in request.resource.data) || (request.resource.data.hubArtUnlocked is list && request.resource.data.hubArtUnlocked.size() <= 1000))
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'matchCount', 'winCount', 'charaWins', 'lastMatchAt'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['rating', 'matchCount', 'winCount', 'charaWins', 'lastMatchAt', 'cpuMatch'])
         && (!("playerName" in request.resource.data) || (request.resource.data.playerName is string && request.resource.data.playerName.size() <= 20))
         && (!("achievements" in request.resource.data) || request.resource.data.achievements is list)
         && (!("achievementCount" in request.resource.data) || (request.resource.data.achievementCount is int && request.resource.data.achievementCount >= 0 && request.resource.data.achievementCount <= 200))

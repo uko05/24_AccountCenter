@@ -157,6 +157,11 @@ exports.cleanupRemovedImage = onDocumentUpdated(`${IMAGES_COLLECTION}/{imageId}`
 // 10_connect(コネバト)のランク戦レート計算(詳細は connect.js 冒頭)
 Object.assign(exports, require('./connect'));
 
+// 10_connect のレート戦で相手が見つからない時のCPU戦(開始・結果の再現とレート。詳細は connectCpu.js 冒頭)
+const connectCpu = require('./connectCpu');
+exports.connectCpuStart = connectCpu.connectCpuStart;
+exports.connectCpuFinish = connectCpu.connectCpuFinish;
+
 // うーこオークションの同時出品数の上限(詳細は auctionLimit.js 冒頭)
 Object.assign(exports, require('./auctionLimit'));
 
