@@ -164,7 +164,8 @@ export function createMatch(opts) {
         straight: false,
     };
     for (const s of ['player', 'cpu']) if (!CHARA_RULES[st.chara[s]]) throw new Error('unknown chara ' + st.chara[s]);
-    st.startingSide = opts.firstSide || (rand(st) < 0.5 ? 'player' : 'cpu');
+    // 対人戦と同じく、最初のラウンドは赤が先手(色はサーバーがランダムに決める)。2ラウンド目からは負けた側が先手
+    st.startingSide = opts.firstSide || (st.color.player === 'red' ? 'player' : 'cpu');
     st.turn = st.startingSide;
     return st;
 }
@@ -242,7 +243,7 @@ function applyUltEffect(st, side, charaID, ev) {
         }
         case '010': { // ルアン・メェイ: 相手3個を自分の色に → 並ばなければ自分の石6個を破壊(重力)
             const conv = pickN(st, Object.keys(S).filter((k) => S[k] === op), 3);
-            if (conv.length) { for (const k of conv) S[k] = me; ev.push({ t: 'convert', keys: conv }); }
+            if (conv.length) { for (const k of conv) S[k] = me; ev.push({ t: 'convert', keys: conv, color: me }); }
             if (firstLineColor(boardOf(S))) break;
             destroy(st, pickN(st, Object.keys(S).filter((k) => S[k] === me), 6), true, ev);
             break;
@@ -269,7 +270,7 @@ function applyUltEffect(st, side, charaID, ev) {
             if (n === 1) destroy(st, pickN(st, keysOf(me), 2), true, ev);
             else if (n === 2) addCharge(st, otherSide(side), 50);
             else if (n === 3) destroy(st, pickN(st, keysOf(op), 1), true, ev);
-            else if (n === 4) { const ks = pickN(st, keysOf(op), 1); if (ks.length) { for (const k of ks) st.stones[k] = me; ev.push({ t: 'convert', keys: ks }); } }
+            else if (n === 4) { const ks = pickN(st, keysOf(op), 1); if (ks.length) { for (const k of ks) st.stones[k] = me; ev.push({ t: 'convert', keys: ks, color: me }); } }
             else if (n === 5) {
                 const v = validCols(st.stones);
                 if (v.length) { const c = v[rInt(st, v.length)]; const r = dropRowOf(st.stones, c); st.stones[key(c, r)] = dropColor(st, side); ev.push({ t: 'drop', col: c, row: r, color: st.stones[key(c, r)], extra: true }); st.turnCount++; }
