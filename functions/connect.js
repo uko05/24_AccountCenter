@@ -77,6 +77,7 @@ function validateResult(room, winnerUid, loserUid, nowMs) {
 exports.connectRateMatch = onDocumentUpdated('connectRooms/{roomId}', async (event) => {
   const room = event.data.after.exists ? event.data.after.data() : null;
   if (!room || room.bo3Final !== true || room.rated !== false || room.matchType !== 'ranked') return;
+  if (room.resultType === 'draw') return; // 3-3の引き分け: レートは動かさない(部屋を消すための印として bo3Final を付けている)
 
   const db = admin.firestore();
   const roomId = event.params.roomId;

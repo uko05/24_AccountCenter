@@ -314,10 +314,19 @@ service cloud.firestore {
           || ("rated" in resource.data && resource.data.rated == request.resource.data.rated)
         );
 
+      // 2026-10-25: 始まった試合(in_progress)の部屋は、決着(bo3Final)するまで参加者でも消せない。
+      // 待っていた人がマッチングした瞬間に読み直すと、ページを離れる時の片付けで相手が入ったばかりの部屋を消していたため。
+      // 決着しないまま残った部屋は、サーバーの定期処理(connectRoomCleanup)が消す
       allow delete: if request.auth != null
         && (
-          resource.data.player1_ID == request.auth.uid
-          || resource.data.player2_ID == request.auth.uid
+          (
+            (resource.data.player1_ID == request.auth.uid || resource.data.player2_ID == request.auth.uid)
+            && (
+              !("status" in resource.data)
+              || resource.data.status != "in_progress"
+              || ("bo3Final" in resource.data && resource.data.bo3Final == true)
+            )
+          )
           || (
             resource.data.status == "waiting"
             && "player1_LastActive" in resource.data
