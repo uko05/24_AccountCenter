@@ -8,6 +8,7 @@
 // 実際の付与はキャンペーン終了後の集計メール経由(従来どおり)。
 
 const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { cleanupOldConnectRooms } = require('./connectRoomCleanup');
 const admin = require('firebase-admin');
 
 const FV = admin.firestore.FieldValue;
@@ -102,6 +103,10 @@ async function settleOne(db, ref, campaigns, roleCache) {
 
 exports.auctionSettleSweep = onSchedule({ schedule: 'every 5 minutes', region: 'asia-northeast1' }, async () => {
   const db = admin.firestore();
+  // コネクトバトルの、動きのなくなった対戦部屋の片付け(connectRoomCleanup.js)。定期実行を増やさないようここで10分おきに行う
+  if (new Date().getMinutes() % 10 < 5) {
+    try { await cleanupOldConnectRooms(); } catch (e) { console.error('[auctionSettleSweep] connect room cleanup failed', e); }
+  }
   const expired = await db.collection('ukoMarketListings')
     .where('status', '==', 'active')
     .where('endsAt', '<=', admin.firestore.Timestamp.now())

@@ -16,7 +16,6 @@ const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const admin = require('firebase-admin');
 const { cleanupOldLikeNotifications } = require('./likeNotifCleanup');
-const { cleanupOldConnectRooms } = require('./connectRoomCleanup');
 const { settleAbandonedCpuMatches } = require('./connectCpu');
 
 const ARCANA_IDS = [
@@ -212,7 +211,7 @@ exports.arcanaTradeSweep = onSchedule({ schedule: 'every 60 minutes', region: 'a
     console.error('[arcanaTradeSweep] like notification cleanup failed', e);
   }
   try {
-    await cleanupOldConnectRooms();
+    // 古い対戦部屋の片付け(cleanupOldConnectRooms)は、2026-10-25 から auctionSettle.js の5分ごとの処理に移した
     // コネバトのCPU戦で、途中で閉じたまま30分たった対局を「退出の負け」にする(connectCpu.js)
     try { await settleAbandonedCpuMatches(); } catch (e) { console.error('[connectCpu] settle failed', e); }
   } catch (e) {
