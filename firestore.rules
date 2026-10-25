@@ -411,7 +411,13 @@ service cloud.firestore {
     // GenshinOmikuji いいね通知（トースト表示＋履歴パネル兼用）
     match /omikujiLikeNotifications/{notifId} {
       allow read, create: if true;
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shown']);
+      // 2026-10-25: 通知は「受け取る人×1時間」で1件にまとめ、いいねのたびに count を1つ足す
+      // (14_GenshinOmikuji/feed.js)。宛先と時刻は変えられず、件数は1ずつしか増やせない。
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shown'])
+        || ('count' in resource.data
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['count', 'fromUserId', 'fromName', 'fromAvatarGame', 'fromAvatarIcon', 'feedId', 'updatedAt'])
+          && request.resource.data.count == resource.data.count + 1);
       allow delete: if isAdmin();
     }
 
