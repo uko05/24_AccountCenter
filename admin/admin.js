@@ -238,6 +238,9 @@ document.getElementById('mail-broadcast-form').addEventListener('submit', async 
       ? `ロール「${ROLE_LABELS[target.role] || target.role}」`
       : `指定した${target.userIds.length}人`;
   const expireDesc = expiresAt ? `${fmtTimestamp(expiresAt)}まで` : '無期限';
+  // 無期限も 2099年末 の日付で保存する(2026-10-25)。おみくじ側は「期限が今より後のメール」だけを
+  // 読むようにしたため(期限切れを含めて毎回50通読んでいた)。期限なし(null)だと読まれなくなる
+  if (!expiresAt) expiresAt = Timestamp.fromDate(new Date(2099, 11, 31, 23, 59, 59));
   if (!confirm(`「${title}」を${targetDesc}のメールボックスに配信します（受け取り期限：${expireDesc}）。よろしいですか？`)) return;
 
   // rewards は claimMail(feed.js)がドット区切りのフィールドパスへそのままincrementするための
