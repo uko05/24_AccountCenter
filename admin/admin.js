@@ -94,7 +94,8 @@ onAuthStateChanged(auth, async (user) => {
   if (isAdmin) {
     whoamiEl.textContent = user.email;
     loadRequests();
-    loadAccounts();
+    // ユーザー一覧は開いた時だけ読む(2026-10-27): 全件で約1.7万件の読み取りになるため、
+    // 管理画面を開いただけでは読まない。下の accounts-details の toggle で初回だけ読み込む。
     // オークション履歴・UP取得履歴系はデフォルトで折りたたんでいるので、ここでは
     // 読み込まない(該当の<details>を初めて開いた時に遅延読み込みする。toggleイベント
     // リスナー側を参照)。無駄なFirestore読み取りを避けるため。
@@ -1448,6 +1449,11 @@ renderFilterFbGenderToggles();
 });
 
 document.getElementById('reload-accounts-btn').addEventListener('click', loadAccounts);
+// 「ユーザー一覧」を初めて開いた時だけ読み込む(以後は「再読み込み」ボタンで更新)
+let accountsLoaded = false;
+document.getElementById('accounts-details')?.addEventListener('toggle', function onToggle() {
+  if (this.open && !accountsLoaded) { accountsLoaded = true; loadAccounts(); }
+});
 accountsFilterEl.addEventListener('input', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 accountsFilterRegisteredEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 accountsFilterUnregisteredEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
@@ -1456,6 +1462,7 @@ accountsFilterStorageEl.addEventListener('change', () => { accountsCurrentPage =
 accountsFilterSavedAnyEl.addEventListener('change', () => { accountsCurrentPage = 1; renderAccounts(accountsFilterEl.value); });
 
 async function loadAccounts() {
+  accountsLoaded = true;
   accountsListEl.innerHTML = '読み込み中…';
   accountsCurrentPage = 1;
 
@@ -1468,7 +1475,8 @@ async function loadAccounts() {
     getDocs(collection(db, 'friendBoardPosts')),
     getDocs(collection(db, 'friendBoardProfiles')),
     getDocs(collection(db, 'friendBoardApplications')),
-    getDocs(collection(db, 'ukoPointsLog')),
+    // 一覧で使うのはキャンペーン由来のUP合計だけなので、その種類の履歴だけ読む(2026-10-27)
+    getDocs(query(collection(db, 'ukoPointsLog'), where('type', 'in', ['auctionSaleBonus', 'auctionCashback', 'auctionListingBonus']))),
   ]);
 
   // キャンペーン取得UP(2026-09-20追加) = ukoPointsLogのうちmeta.campaignTypeを持つ
@@ -1782,7 +1790,9 @@ document.getElementById('search-btn').addEventListener('click', async () => {
   });
 
   if (results.size === 0) {
-    searchResultsEl.innerHTML = '該当するユーザーが見つかりませんでした。';
+    searchResultsEl.innerHTML = allAccounts.length
+      ? '該当するユーザーが見つかりませんでした。'
+      : '該当するユーザーが見つかりませんでした（完全一致のみで検索しました。部分一致で探すには、先に下の「ユーザー一覧」を開いてください）。';
     return;
   }
 
