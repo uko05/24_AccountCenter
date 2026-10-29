@@ -399,12 +399,22 @@ export function doDrop(st, side, col) {
         st.stones[key(col, row)] = otherColor(st.stones[key(col, row)]);
         ev.push({ t: 'flip', keys: [...ks, key(col, row)] });
     }
-    // ケリュドラ: 使った側の相手が置いた後、同じ列(満杯ならランダムな空き列)に相手の本来の色の石をもう1つ
+    // ケリュドラ(2026-10-30 改): 使った側の相手が置いた後、空いている全部の列に相手の本来の色の石を1つずつ落とし、
+    // その落とした石のうちランダムな1つを使った側の色に変える
     if (st.cerydra.active && st.cerydra.caster !== side) {
         st.cerydra = { active: false, caster: null };
-        const v = validCols(st.stones);
-        const extra = dropRowOf(st.stones, col) >= 0 ? col : (v.length ? v[rInt(st, v.length)] : -1);
-        if (extra >= 0) { const r = dropRowOf(st.stones, extra); st.stones[key(extra, r)] = colorOf(st, side); ev.push({ t: 'drop', col: extra, row: r, color: colorOf(st, side), extra: true }); }
+        const vc = colorOf(st, side);
+        const dropped = [];
+        for (const c of validCols(st.stones)) {
+            const r = dropRowOf(st.stones, c);
+            st.stones[key(c, r)] = vc; dropped.push(key(c, r));
+            ev.push({ t: 'drop', col: c, row: r, color: vc, extra: true });
+        }
+        if (dropped.length) {
+            const k = dropped[rInt(st, dropped.length)];
+            st.stones[k] = otherColor(vc);
+            ev.push({ t: 'convert', keys: [k], color: otherColor(vc) });
+        }
     }
     addCharge(st, side, CHARA_RULES[st.chara[side]].charge);
     if (st.changeStone > 0) st.changeStone--;
@@ -547,7 +557,8 @@ function ultCondition(st, side, charaID, plan) {
             }
             return false;
         }
-        case '015': return false;
+        // ケリュドラ: 「この列にもう1つ積まれれば、その上に置いて勝てる」列があるときだけ使う
+        case '015': return validCols(S).some((c) => { const r = dropRowOf(S, c); if (r <= 0) return false; return wouldWinCol({ ...S, [key(c, r)]: op }, c, me); });
         case '009': case '016': case '017': return true;
         case '011': { let n = 0; for (let c = 0; c < COLS; c++) if (S[key(c, 4)] === op) n++; return n >= 2 || opThreat(); }
         case '006': {
