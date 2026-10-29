@@ -580,13 +580,17 @@ service cloud.firestore {
         && isArcanaCounts(request.resource.data.counts)
         && request.resource.data.spare is list && request.resource.data.spare.size() <= 22
         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['reservedOut']);
-      allow delete: if false;
+      // 本人が掲載を取り下げる(承認済みで交換予定のカードがある間はできない)
+      allow delete: if request.auth != null
+        && userId == myOmikujiId()
+        && (!('reservedOut' in resource.data) || resource.data.reservedOut.size() == 0);
     }
     // 原神UID。本人だけが読み書きできる(承認されたときにサーバーが申請へ写す)
     match /arcanaTradePrivate/{userId} {
       allow read: if request.auth != null && userId == myOmikujiId();
       allow create, update: if request.auth != null && userId == myOmikujiId()
         && request.resource.data.genshinUid is string && request.resource.data.genshinUid.size() <= 12;
+      allow delete: if request.auth != null && userId == myOmikujiId();
     }
     // 交換申請。当事者だけが読める
     match /arcanaTradeRequests/{requestId} {
