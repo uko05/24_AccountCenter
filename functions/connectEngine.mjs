@@ -16,7 +16,7 @@ export const ROWS = 6;
 export const COLS = 7;
 export const ULT_COST = 150;
 export const CHARGE_MAX = 200;
-export const BOMB_TURNS = 4;
+export const BOMB_TURNS = 2;
 export const CASTORICE_REFUND = 5;
 const ALHAITHAM_COLS = [2, 3, 4];
 const CASTORICE_COLS = [0, 1, 5, 6];
@@ -137,6 +137,12 @@ function gravityFlipStones(stones) {
     return { stones: out, moved };
 }
 function flipNeighbors(col, row) { const ks = []; if (col - 1 >= 0) ks.push(key(col - 1, row)); if (col + 1 < COLS) ks.push(key(col + 1, row)); return ks; }
+function bombValue(S, t, op) { let x = 0; for (const k of bombBlast(t)) { if (S[k] === op) x++; else if (S[k]) x--; } return x; }
+function bestBombTargets(S, op) {
+    let best = -Infinity, out = [];
+    for (const t of Object.keys(S)) { if (S[t] !== op) continue; const x = bombValue(S, t, op); if (x > best) { best = x; out = [t]; } else if (x === best) out.push(t); }
+    return out;
+}
 function bombBlast(k) {
     const [c, r] = parseKey(k); const out = [];
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { const rr = r + dr, cc = c + dc; if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) out.push(key(cc, rr)); }
@@ -260,7 +266,10 @@ function applyUltEffect(st, side, charaID, ev) {
             if (oc !== '013') applyUltEffect(st, side, oc, ev);
             break;
         }
-        case '014': destroy(st, pickN(st, Object.keys(S), Math.min(2, Object.keys(S).length)), true, ev); st.durin = { pending: true, caster: side }; break;
+        case '014': { // ドゥリン: 相手の石を1個破壊。次の自分の番の開始時にも相手の石を1個(2026-10-30)
+            const pool = Object.keys(S).filter((k) => S[k] === op);
+            destroy(st, pickN(st, pool, Math.min(1, pool.length)), true, ev); st.durin = { pending: true, caster: side }; break;
+        }
         case '015': st.cerydra = { active: true, caster: side }; break;
         case '016': st.wins[side]++; ev.push({ t: 'point', side }); if (st.wins[side] >= 3) finishMatch(st, side, 'normal', ev); break;
         case '017': { // アベンチュリン: ダイスロール
@@ -279,8 +288,8 @@ function applyUltEffect(st, side, charaID, ev) {
             ev.push({ t: 'charge' });
             break;
         }
-        case '018': { // クレー: 相手の石1つを爆弾に(4ターン後の自分の番の開始時に周り8マスを破壊)
-            const tgt = pickN(st, Object.keys(S).filter((k) => S[k] === op), 1)[0];
+        case '018': { // クレー: 一番多く相手の石を巻き込める相手の石を爆弾に(次の自分の番の開始時に周り8マスを破壊)
+            const tgt = pickN(st, bestBombTargets(S, op), 1)[0];
             if (tgt) { st.bomb = { key: tgt, turnsLeft: BOMB_TURNS, caster: side }; ev.push({ t: 'bomb', key: tgt }); }
             break;
         }
@@ -349,8 +358,9 @@ function preTurn(st, side, ev) {
     }
     if (st.durin.pending && st.durin.caster === side) {
         st.durin = { pending: false, caster: null };
-        const all = Object.keys(st.stones);
-        destroy(st, pickN(st, all, Math.min(2, all.length)), true, ev);
+        const vc = otherColor(colorOf(st, side));
+        const all = Object.keys(st.stones).filter((k) => st.stones[k] === vc);
+        destroy(st, pickN(st, all, Math.min(1, all.length)), true, ev);
     }
     if (st.bomb) {
         st.bomb.turnsLeft--;
@@ -542,9 +552,8 @@ function ultCondition(st, side, charaID, plan) {
     switch (charaID) {
         case '020': { const sim = gravityFlipStones(S).stones; const b = boardOf(sim); if (hasLineOf(b, op)) return false; if (hasLineOf(b, me)) return true; return opThreat() && !threatIn(sim, op); }
         case '018': {
-            const targets = Object.keys(S).filter((k) => S[k] === op); if (!targets.length) return false;
-            let total = 0; for (const t of targets) for (const k of bombBlast(t)) { if (S[k] === op) total++; else if (S[k] === me) total--; }
-            return total / targets.length >= 1.5;
+            const t = bestBombTargets(S, op)[0]; if (!t) return false;
+            return bombValue(S, t, op) >= 3;
         }
         case '019': {
             const dc = dropColor(st, side);
