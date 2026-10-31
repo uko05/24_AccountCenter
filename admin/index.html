@@ -209,6 +209,20 @@
     </details>
   </section>
 
+  <section class="section" id="wish-log-section">
+    <details id="wish-log-details">
+      <summary style="cursor:pointer; color:var(--gold); font-size:0.82rem; letter-spacing:0.15em; font-weight:bold;">願いの結晶の履歴</summary>
+      <div style="margin-top:14px;">
+        <p class="section-desc">うーこポイント交換所で願いの結晶を交換した人と、おみくじで願いの結晶を使ってどの裏面を手に入れたかの履歴です（新しい順、最大500件）。名前を押すとその人の編集画面を開きます。</p>
+        <button id="reload-wish-log-btn" class="secondary-btn" style="margin-bottom:10px;">再読み込み</button>
+        <div id="wish-log-count" class="section-desc" style="margin:0 0 6px;"></div>
+        <div style="overflow-x:auto;">
+          <div id="wish-log-list"></div>
+        </div>
+      </div>
+    </details>
+  </section>
+
   <section class="section" id="campaign-management-section">
     <div class="section-title">うーこオークション キャンペーン管理</div>
     <p class="section-desc">期間限定で出品・落札にボーナスUPが付くキャンペーンを作成・管理します。複数のキャンペーンを同時に開催できます。26_UkoAuction・14_GenshinOmikujiが自動的に反映します。</p>
@@ -480,9 +494,9 @@
   <img id="admin-lightbox-img" src="" alt="" style="max-width:90vw; max-height:90vh; border-radius:8px;">
 </div>
 
-<span id="site-version" class="site-version">v1.16</span>
+<span id="site-version" class="site-version">v1.17</span>
 
-<script type="module" src="admin.js?v=39"></script>
+<script type="module" src="admin.js?v=40"></script>
 <script src="https://uko05.github.io/TopPage00/shared/sidebar.js"></script>
 </body>
 </html>

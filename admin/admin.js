@@ -768,6 +768,74 @@ function renderLikeUpHistory() {
   if (pager) likeUpHistoryListEl.appendChild(pager);
 }
 
+// ===== 願いの結晶の履歴(2026-11-01追加) =====
+// 誰が願いの結晶を交換したか(wishCrystalBuy、08_UPoint)・どの裏面に使ったか(wishCrystalUse、
+// 14_GenshinOmikuji/wishCrystal.js)を ukoPointsLog から読んで新しい順に並べる。
+// UP取得履歴は直近300件しか読まないので埋もれないよう、種類で絞って別に読む(開いたときだけ)。
+const WISH_LOG_FETCH_LIMIT = 500;
+const wishLogListEl = document.getElementById('wish-log-list');
+const wishLogCountEl = document.getElementById('wish-log-count');
+let wishLogLoaded = false;
+document.getElementById('reload-wish-log-btn')?.addEventListener('click', loadWishLog);
+document.getElementById('wish-log-details')?.addEventListener('toggle', function onToggle() {
+  if (this.open && !wishLogLoaded) { wishLogLoaded = true; loadWishLog(); }
+});
+
+async function loadWishLog() {
+  if (!wishLogListEl) return;
+  wishLogListEl.innerHTML = '読み込み中…';
+  try {
+    // createdAt で並べる複合インデックスを増やさないよう、種類だけで絞ってブラウザ側で並べ替える
+    const snap = await getDocs(query(
+      collection(db, 'ukoPointsLog'),
+      where('type', 'in', ['wishCrystalBuy', 'wishCrystalUse']),
+      limit(WISH_LOG_FETCH_LIMIT),
+    ));
+    const rows = snap.docs.map((d) => d.data())
+      .map((d) => ({ ...d, createdAtMs: d.createdAt?.toMillis?.() ?? 0 }))
+      .sort((a, b) => b.createdAtMs - a.createdAtMs);
+    renderWishLog(rows);
+  } catch (e) {
+    console.error('[admin] wish log load failed', e);
+    wishLogListEl.innerHTML = '読み込みに失敗しました。';
+  }
+}
+
+function renderWishLog(rows) {
+  const buys = rows.filter((r) => r.type === 'wishCrystalBuy').length;
+  const uses = rows.filter((r) => r.type === 'wishCrystalUse').length;
+  if (wishLogCountEl) wishLogCountEl.textContent = `交換 ${buys}件 ／ 使用 ${uses}件`;
+  if (!rows.length) { wishLogListEl.innerHTML = 'まだ履歴はありません。'; return; }
+  const designById = new Map(ALL_CARD_DESIGNS.map((d) => [d.id, d]));
+  const table = document.createElement('table');
+  table.className = 'user-table';
+  table.innerHTML = '<thead><tr><th>日時</th><th>名前</th><th>内容</th><th>裏面</th></tr></thead><tbody></tbody>';
+  const tbody = table.querySelector('tbody');
+  rows.forEach((r) => {
+    const name = lookupOmikujiName(r.userId);
+    const isUse = r.type === 'wishCrystalUse';
+    const design = isUse ? designById.get(r.meta?.itemId) : null;
+    const backCell = isUse
+      ? `${design ? `<img src="${escapeHtml(design.url)}" alt="" loading="lazy" style="width:28px; height:47px; object-fit:cover; border-radius:3px; vertical-align:middle; margin-right:6px;">` : ''}${escapeHtml(r.meta?.itemName || r.meta?.itemId || '')}`
+      : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="white-space:nowrap;">${escapeHtml(fmtTimestamp(r.createdAtMs))}</td>
+      <td style="white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(name)}">
+        <span class="admin-user-link" data-omikuji-id="${escapeHtml(r.userId)}" style="cursor:pointer; color:#2a6fdb; text-decoration:underline;">${escapeHtml(name)}</span>
+      </td>
+      <td style="white-space:nowrap;">${isUse ? '使用' : `交換（${-(r.amount || 0)}UP）`}</td>
+      <td style="white-space:nowrap;">${backCell}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+  table.querySelectorAll('[data-omikuji-id]').forEach((el) => {
+    el.addEventListener('click', () => openEditorByOmikujiId(el.dataset.omikujiId));
+  });
+  wishLogListEl.innerHTML = '';
+  wishLogListEl.appendChild(table);
+}
+
 // ===== UP取得履歴（オークション・ミッション、2026-09-19追加） =====
 // ukoPointsLog(26_UkoAuction/14_GenshinOmikuji/08_UPointがukoPointsを増やす
 // トランザクションと同時に書き込む監査ログ)をそのまま一覧表示する。いいねと違って
@@ -785,6 +853,8 @@ const UP_LOG_TYPE_LABELS = {
   auctionListingFee: 'オークション出品手数料', // 1件5UP(2026-10-14追加、金額はマイナス)
   cardSell: '裏面のまとめて売却', // おみくじのダブり売却(2026-10-14追加、1枚10UP)
   adminPenalty: '管理者による差し引き', // サブアカウント対応などで管理者が減らした分(2026-10-10追加、金額はマイナス)
+  wishCrystalBuy: '願いの結晶の交換', // UP交換所で願いの結晶を交換(2026-11-01追加、金額はマイナス)
+  wishCrystalUse: '願いの結晶の使用', // 願いの結晶で裏面を入手(2026-11-01追加、金額は0)
 };
 const upLogTypeFilterEls = Object.fromEntries(
   Object.keys(UP_LOG_TYPE_LABELS).map((type) => [type, document.getElementById(`up-log-history-filter-${type}`)])
