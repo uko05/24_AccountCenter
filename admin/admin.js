@@ -817,7 +817,8 @@ function renderWishLog(rows) {
   table.innerHTML = '<thead><tr><th>日時</th><th>名前</th><th>内容</th><th>裏面</th></tr></thead><tbody></tbody>';
   const tbody = table.querySelector('tbody');
   rows.forEach((r) => {
-    const name = lookupOmikujiName(r.userId);
+    // 記録したときの名前(meta.userName)を、ユーザー一覧から見つからないときの予備にする
+    const name = lookupOmikujiName(r.userId, r.meta?.userName);
     const isUse = r.type === 'wishCrystalUse';
     const design = isUse ? designById.get(r.meta?.itemId) : null;
     const backCell = isUse
