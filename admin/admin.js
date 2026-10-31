@@ -432,6 +432,11 @@ async function loadAuctionHistory() {
     ));
     latestAuctionHistory = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderAuctionHistory();
+    // 入札時の名前が残っていない落札者・名前の無い出品者だけ読む
+    resolveOmikujiNames([
+      ...latestAuctionHistory.filter((i) => !(i.soldTo && i.soldTo === i.currentBidderId && i.currentBidderName)).map((i) => i.soldTo),
+      ...latestAuctionHistory.filter((i) => !i.sellerName).map((i) => i.sellerId),
+    ], renderAuctionHistory);
   } catch (e) {
     console.error('[admin] auction history load failed', e);
     auctionHistoryListEl.innerHTML = '読み込みに失敗しました。';
@@ -442,9 +447,31 @@ async function loadAuctionHistory() {
 // 作った「全ユーザーのID→名前」(omikujiNameById)から名前を逆引きする。
 // 2026-11-01: 以前は allAccounts(実績1件以上の人だけ)から探していたため、実績0件の人や
 // ユーザー一覧の読み込み前は落札者がIDのまま表示されていた。fallback は見つからないときに出す名前。
+// ユーザー一覧は欄を開いたときしか読まない(全員分で読み取りが多い)ので、各履歴を読んだあとに
+// resolveOmikujiNames で「名前が分からない人だけ」を1人1回ずつ読んで埋める(名前が無い人は '' を入れて読み直さない)。
 const omikujiNameById = new Map();
 function lookupOmikujiName(omikujiUserId, fallback = '') {
   return omikujiNameById.get(omikujiUserId) || fallback || omikujiUserId || '';
+}
+const NAME_RESOLVE_MAX = 200; // 1回で読む人数の上限(読み取りが膨らみすぎないように)
+const nameResolveInFlight = new Set();
+async function resolveOmikujiNames(ids, rerender) {
+  const missing = [...new Set(ids)]
+    .filter((id) => id && !omikujiNameById.has(id) && !nameResolveInFlight.has(id))
+    .slice(0, NAME_RESOLVE_MAX);
+  if (!missing.length) return;
+  missing.forEach((id) => nameResolveInFlight.add(id));
+  await Promise.all(missing.map(async (id) => {
+    try {
+      const snap = await getDoc(doc(db, 'omikujiUsers', id));
+      omikujiNameById.set(id, snap.exists() ? (snap.data().name || '') : '');
+    } catch (e) {
+      console.warn('[admin] name lookup failed', id, e);
+    } finally {
+      nameResolveInFlight.delete(id);
+    }
+  }));
+  rerender();
 }
 
 // オークション履歴の出品者/落札者名クリック用: 下のユーザー一覧セクションと同じ
@@ -640,6 +667,7 @@ async function loadLikeUpHistory() {
     ));
     latestLikeDocs = snap.docs.map((d) => d.data());
     renderLikeUpHistory();
+    resolveOmikujiNames(aggregateLikeUpHistory().map((g) => g.userId), renderLikeUpHistory);
   } catch (e) {
     console.error('[admin] like history load failed', e);
     likeUpHistoryListEl.innerHTML = '読み込みに失敗しました。';
@@ -799,6 +827,7 @@ async function loadWishLog() {
       .map((d) => ({ ...d, createdAtMs: d.createdAt?.toMillis?.() ?? 0 }))
       .sort((a, b) => b.createdAtMs - a.createdAtMs);
     renderWishLog(rows);
+    resolveOmikujiNames(rows.filter((r) => !r.meta?.userName).map((r) => r.userId), () => renderWishLog(latestWishLogRows));
   } catch (e) {
     console.error('[admin] wish log load failed', e);
     wishLogListEl.innerHTML = '読み込みに失敗しました。';
@@ -896,6 +925,7 @@ async function loadUpLogHistory() {
     ));
     latestUpLogDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderUpLogHistory();
+    resolveOmikujiNames(latestUpLogDocs.map((d) => d.userId), renderUpLogHistory);
   } catch (e) {
     console.error('[admin] up log history load failed', e);
     upLogHistoryListEl.innerHTML = '読み込みに失敗しました。';
