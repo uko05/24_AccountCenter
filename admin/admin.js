@@ -438,11 +438,13 @@ async function loadAuctionHistory() {
   }
 }
 
-// 落札者(soldTo)はomikuji IDしか出品ドキュメントに残っていないため、既に読み込み済みの
-// allAccounts(ユーザー一覧)から名前を逆引きする(未取得なら諦めてIDをそのまま出す)。
-function lookupOmikujiName(omikujiUserId) {
-  const account = allAccounts.find((a) => a.omikujiUserId === omikujiUserId);
-  return account?.omikujiData?.name || omikujiUserId || '';
+// 落札者(soldTo)はomikuji IDしか出品ドキュメントに残っていないため、ユーザー一覧の読み込みで
+// 作った「全ユーザーのID→名前」(omikujiNameById)から名前を逆引きする。
+// 2026-11-01: 以前は allAccounts(実績1件以上の人だけ)から探していたため、実績0件の人や
+// ユーザー一覧の読み込み前は落札者がIDのまま表示されていた。fallback は見つからないときに出す名前。
+const omikujiNameById = new Map();
+function lookupOmikujiName(omikujiUserId, fallback = '') {
+  return omikujiNameById.get(omikujiUserId) || fallback || omikujiUserId || '';
 }
 
 // オークション履歴の出品者/落札者名クリック用: 下のユーザー一覧セクションと同じ
@@ -478,7 +480,8 @@ function renderAuctionHistory() {
   let rows = latestAuctionHistory.map((item) => ({
     item,
     sellerName: item.sellerName || lookupOmikujiName(item.sellerId),
-    buyerName: lookupOmikujiName(item.soldTo),
+    // 入札で落札された物は、入札時に記録された名前(currentBidderName)を予備に使う
+    buyerName: lookupOmikujiName(item.soldTo, item.soldTo && item.soldTo === item.currentBidderId ? item.currentBidderName : ''),
     soldViaLabel: AUCTION_SOLD_VIA_LABELS[item.soldVia] || item.soldVia || '',
   })).filter((r) => {
     if (r.item.soldVia === 'bid' && !showBid) return false;
@@ -776,6 +779,7 @@ const WISH_LOG_FETCH_LIMIT = 500;
 const wishLogListEl = document.getElementById('wish-log-list');
 const wishLogCountEl = document.getElementById('wish-log-count');
 let wishLogLoaded = false;
+let latestWishLogRows = [];
 document.getElementById('reload-wish-log-btn')?.addEventListener('click', loadWishLog);
 document.getElementById('wish-log-details')?.addEventListener('toggle', function onToggle() {
   if (this.open && !wishLogLoaded) { wishLogLoaded = true; loadWishLog(); }
@@ -802,6 +806,7 @@ async function loadWishLog() {
 }
 
 function renderWishLog(rows) {
+  latestWishLogRows = rows;
   const buys = rows.filter((r) => r.type === 'wishCrystalBuy').length;
   const uses = rows.filter((r) => r.type === 'wishCrystalUse').length;
   if (wishLogCountEl) wishLogCountEl.textContent = `交換 ${buys}件 ／ 使用 ${uses}件`;
@@ -1626,6 +1631,17 @@ async function loadAccounts() {
     if (!ownerUid) return;
     storageImageCountByAuthUid.set(ownerUid, (storageImageCountByAuthUid.get(ownerUid) || 0) + 1);
   });
+
+  // 名前の逆引き用(実績0件の人も含めた全員分)。読み込み済みの履歴は名前を出し直す
+  omikujiNameById.clear();
+  usersSnap.docs.forEach((userDoc) => {
+    const name = userDoc.data().name;
+    if (name) omikujiNameById.set(userDoc.id, name);
+  });
+  if (latestAuctionHistory.length) renderAuctionHistory();
+  if (latestUpLogDocs.length) renderUpLogHistory();
+  if (latestLikeDocs.length) renderLikeUpHistory();
+  if (latestWishLogRows.length) renderWishLog(latestWishLogRows);
 
   allAccounts = usersSnap.docs
     .filter((userDoc) => (userDoc.data().achStats?.totalCount || 0) > 0)
