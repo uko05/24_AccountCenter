@@ -635,13 +635,32 @@ export function cpuChooseCol(st, side, profile, plan = {}) {
     const playable = playableCols(st, side);
     if (plan.hanabiCol >= 0 && playable.includes(plan.hanabiCol)) return plan.hanabiCol;
     if (plan.flipCol >= 0 && playable.includes(plan.flipCol)) return plan.flipCol;
+    // 花火の色反転中は、この手で落ちる石が相手の色になる(2026-11-03。以前はそれを知らずに選び、相手の4つ並びを完成させていた)
+    const swapped = st.changeStone > 0;
+    const put = swapped ? op : me;
     // 読み間違い(人間らしい凡ミス): すぐ勝てる時は見逃さない。相手にすぐ勝たせる手はなるべく避ける
-    if (profile.mistake > 0 && rand(st) < profile.mistake && !playable.some((c) => wouldWinCol(st.stones, c, me))) {
-        const safe = playable.filter((c) => { const r = dropRowOf(st.stones, c); const s = { ...st.stones, [key(c, r)]: me }; return !threatIn(s, op); });
-        const pool = safe.length ? safe : playable;
+    if (profile.mistake > 0 && rand(st) < profile.mistake && (swapped || !playable.some((c) => wouldWinCol(st.stones, c, me)))) {
+        const after = (c) => { const r = dropRowOf(st.stones, c); return { ...st.stones, [key(c, r)]: put }; };
+        const noLine = playable.filter((c) => !hasLineOf(boardOf(after(c)), op)); // 相手の4つ並びをその場で完成させない
+        const safe = noLine.filter((c) => !threatIn(after(c), op));
+        const pool = safe.length ? safe : noLine.length ? noLine : playable;
         return pool[rInt(st, pool.length)];
     }
     const ctx = { nodes: 0, chara: st.chara[side], oppChara: st.chara[otherSide(side)] };
+    if (swapped) {
+        // 最初の1手だけ「相手の色を置く」として読み、一番被害の少ない列を選ぶ
+        const b = boardOf(st.stones);
+        let best = -Infinity, bestCol;
+        for (const c of ORDER.filter((x) => playable.includes(x))) {
+            const r = dropRowOf(st.stones, c);
+            if (r < 0) continue;
+            b[r][c] = op;
+            const x = minimax(b, Math.max(0, profile.depth - 1), -Infinity, Infinity, false, me, ctx).s;
+            b[r][c] = null;
+            if (x > best) { best = x; bestCol = c; }
+        }
+        return bestCol !== undefined ? bestCol : playable[0];
+    }
     const res = minimax(boardOf(st.stones), profile.depth, -Infinity, Infinity, true, me, ctx);
     if (res.c !== undefined && playable.includes(res.c)) return res.c;
     return playable[0];
