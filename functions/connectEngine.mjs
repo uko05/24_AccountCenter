@@ -24,9 +24,9 @@ const CASTORICE_COLS = [0, 1, 5, 6];
 // キャラの決まり(characterData.js と同じ値。サーバーはクライアントの申告ではなくこの表を使う)
 export const CHARA_RULES = {
     '001': { charge: 14, turn: 10 }, '002': { charge: 15, turn: 6 }, '003': { charge: 11, turn: 10 },
-    '004': { charge: 9, turn: 1 }, '005': { charge: 10, turn: 1 }, '006': { charge: 10, turn: 1 },
-    '007': { charge: 15, turn: 6 }, '008': { charge: 12, turn: 6 }, '009': { charge: 17, turn: 5 },
-    '010': { charge: 9, turn: 18 }, '011': { charge: 8, turn: 10 }, '012': { charge: 15, turn: 5 },
+    '004': { charge: 10, turn: 1 }, '005': { charge: 10, turn: 1 }, '006': { charge: 10, turn: 1 },
+    '007': { charge: 16, turn: 6 }, '008': { charge: 12, turn: 6 }, '009': { charge: 17, turn: 5 },
+    '010': { charge: 9, turn: 18 }, '011': { charge: 9, turn: 10 }, '012': { charge: 15, turn: 5 },
     '013': { charge: 14, turn: 1 }, '014': { charge: 15, turn: 8 }, '015': { charge: 16, turn: 1 },
     '016': { charge: 8, turn: 1 }, '017': { charge: 18, turn: 1 }, '018': { charge: 16, turn: 6 },
     '019': { charge: 13, turn: 6 }, '020': { charge: 15, turn: 8 },
@@ -561,7 +561,8 @@ function characterBonus(b, me, charaID, oppCharaID) {
         case '002': return topStonesBonus(b, me, 1, 2);
         case '004': for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { if (b[r][c] === me) x += r >= 3 ? 4 : -2; else if (b[r][c] === op) x -= r >= 3 ? 1 : 0; } return x;
         case '003': for (let r = 0; r < ROWS; r++) for (const c of ALHAITHAM_COLS) { if (b[r][c] === me) x -= 3; else if (b[r][c] === op) x += 3; } return x;
-        case '007': for (let r = 0; r < ROWS; r++) for (const c of CASTORICE_COLS) { if (b[r][c] === me) x -= 3; else if (b[r][c] === op) x += 3; } return x;
+        // キャストリス: 自分の置き場所を狭めすぎて弱かったので、自分の石の減点を弱めた(-3 → -1、2026-11-03)
+        case '007': for (let r = 0; r < ROWS; r++) for (const c of CASTORICE_COLS) { if (b[r][c] === me) x -= 1; else if (b[r][c] === op) x += 3; } return x;
         case '011': for (let c = 0; c < COLS; c++) if (b[4][c] === op) x += 5; return x;
     }
     return extraCharaBonus(b, me, charaID);
