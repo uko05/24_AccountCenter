@@ -29,7 +29,7 @@ export const CHARA_RULES = {
     '010': { charge: 9, turn: 18 }, '011': { charge: 8, turn: 10 }, '012': { charge: 15, turn: 5 },
     '013': { charge: 14, turn: 1 }, '014': { charge: 15, turn: 8 }, '015': { charge: 16, turn: 1 },
     '016': { charge: 8, turn: 1 }, '017': { charge: 18, turn: 1 }, '018': { charge: 16, turn: 6 },
-    '019': { charge: 12, turn: 6 }, '020': { charge: 15, turn: 8 },
+    '019': { charge: 13, turn: 6 }, '020': { charge: 15, turn: 8 },
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -461,12 +461,90 @@ export function doLeave(st, side) {
 
 // ---------------------------------------------------------------------------------------------
 // CPUの考え方(soloLogic.js の minimax・発動条件と同じ)
-function scoreWindow(a, b, c, d, me) {
+// ===== CPUの打ち方のクセ(2026-11-03) =====
+// 性格: 攻め寄りは自分の並びの点を、守り寄りは相手の並びの減点を重くする。
+// 重み [自分3つ+空き1, 自分2つ+空き2, 相手3つ+空き1, 相手2つ+空き2]。CPU戦(soloLogic.js)もここを使う
+export const CHARA_STYLE = {
+    '009': 'attackLight', // ホタル: 追加の1個で並びを伸ばす(攻め寄りを強くすると勝率が下がったので軽め)
+    '012': 'attack',  // 鍾離: 封鎖中に勝ち筋を複数作る
+    '010': 'defense', // ルアン・メェイ: 終盤まで粘る
+    '014': 'defense', // ドゥリン: 相手の石を少しずつ壊すので粘る
+    '016': 'defense', // 銀狼: 粘ってゲージをためる
+};
+const STYLE_WEIGHTS = { normal: [5, 2, -4, -1], attack: [7, 3, -4, -1], attackLight: [6, 2, -4, -1], defense: [5, 2, -6, -2] };
+export function styleWeights(charaID) { return STYLE_WEIGHTS[CHARA_STYLE[charaID]] || STYLE_WEIGHTS.normal; }
+// 気まぐれなキャラ(読み間違い・少し低い手を打つ確率を2倍にする)
+export const WHIMSICAL_CHARAS = ['017']; // アベンチュリン
+
+function scoreWindow(a, b, c, d, me, w = STYLE_WEIGHTS.normal) {
     let m = 0, t = 0, e = 0;
     for (const v of [a, b, c, d]) { if (v === null) e++; else if (v === me) m++; else t++; }
     if (m === 4) return 100000; if (t === 4) return -100000;
-    if (m === 3 && e === 1) return 5; if (m === 2 && e === 2) return 2;
-    if (t === 3 && e === 1) return -4; if (t === 2 && e === 2) return -1;
+    if (m === 3 && e === 1) return w[0]; if (m === 2 && e === 2) return w[1];
+    if (t === 3 && e === 1) return w[2]; if (t === 2 && e === 2) return w[3];
+    return 0;
+}
+
+// 必殺技に合わせた置き方の点(2026-11-03)。b[行][列](行0が一番上)、me は自分の色。CPU戦(soloLogic.js)もここを使う
+export function extraCharaBonus(b, me, charaID) {
+    const op = otherColor(me);
+    let x = 0;
+    switch (charaID) {
+        case '008': { // 魈: 相手の石が一番多い縦1列を壊す → 相手の石は1列に集め、その列に自分の石を置かない
+            let best = 0, bc = -1;
+            for (let c = 0; c < COLS; c++) { let n = 0; for (let r = 0; r < ROWS; r++) if (b[r][c] === op) n++; if (n > best) { best = n; bc = c; } }
+            if (bc >= 0) { let m = 0; for (let r = 0; r < ROWS; r++) if (b[r][bc] === me) m++; x += 2 * best - 3 * m; }
+            return x;
+        }
+        case '006': { // マダム・ヘルタ: 相手の石が一番多い横1段を壊す → 魈の横版
+            let best = 0, br = -1;
+            for (let r = 0; r < ROWS; r++) { let n = 0; for (let c = 0; c < COLS; c++) if (b[r][c] === op) n++; if (n > best) { best = n; br = r; } }
+            if (br >= 0) { let m = 0; for (let c = 0; c < COLS; c++) if (b[br][c] === me) m++; x += 2 * best - 3 * m; }
+            return x;
+        }
+        case '018': { // クレー: 相手の石が一番固まっている所を爆破 → 相手の石が固まる形を好み、自分の石はそこから離す
+            let bestN = 0, bestM = 0;
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+                if (b[r][c] !== op) continue;
+                let n = 0, m = 0;
+                for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+                    const rr = r + dr, cc = c + dc;
+                    if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS) continue;
+                    if (b[rr][cc] === op) n++; else if (b[rr][cc] === me) m++;
+                }
+                if (n > bestN || (n === bestN && m < bestM)) { bestN = n; bestM = m; }
+            }
+            return bestN >= 2 ? 2 * bestN - 3 * bestM : 0;
+        }
+        case '019': { // フリーナ: 置いた石の左右を反転 → 次に置ける所の左右両方に相手の石がある形を好む
+            for (let c = 0; c < COLS; c++) {
+                let r = -1; for (let rr = ROWS - 1; rr >= 0; rr--) if (b[rr][c] === null) { r = rr; break; }
+                if (r < 0) continue;
+                if (c > 0 && c < COLS - 1 && b[r][c - 1] === op && b[r][c + 1] === op) { x = 3; break; }
+            }
+            return x;
+        }
+        case '020': { // 星神★アッハ: 盤面を上下逆にする → 各列の一番上に自分の石を置く(逆さにすると一番下に来る)
+            for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS; r++) { if (b[r][c] === null) continue; x += b[r][c] === me ? 2 : -2; break; }
+            return x;
+        }
+        case '015': // ケリュドラ: 全部の列の上に相手の石を落とす → 自分の石は下の段(下3段)を固める
+            for (let r = 3; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (b[r][c] === me) x += 1;
+            return x;
+        case '005': { // 花火: 「あと1つの空きが1段浮いている3つ並び(横・斜め)」を好む。
+            // 色反転で相手の色の石をその下に入れさせ(または自分で入れ)、次の手で空きに置いて勝てる
+            const floating = (r, c) => r + 1 < ROWS && b[r + 1][c] === null && (r + 2 >= ROWS || b[r + 2][c] !== null);
+            const win4 = (cells) => {
+                let m = 0, empty = null;
+                for (const [r, c] of cells) { const v = b[r][c]; if (v === me) m++; else if (v === null) { if (empty) return; empty = [r, c]; } else return; }
+                if (m === 3 && empty && floating(empty[0], empty[1])) x += 2;
+            };
+            for (let r = 0; r < ROWS; r++) for (let c = 0; c <= COLS - 4; c++) win4([[r, c], [r, c + 1], [r, c + 2], [r, c + 3]]);
+            for (let r = 0; r <= ROWS - 4; r++) for (let c = 0; c <= COLS - 4; c++) win4([[r, c], [r + 1, c + 1], [r + 2, c + 2], [r + 3, c + 3]]);
+            for (let r = 0; r <= ROWS - 4; r++) for (let c = 3; c < COLS; c++) win4([[r, c], [r + 1, c - 1], [r + 2, c - 2], [r + 3, c - 3]]);
+            return x;
+        }
+    }
     return 0;
 }
 function topStonesBonus(b, me, depth, w) {
@@ -486,15 +564,16 @@ function characterBonus(b, me, charaID, oppCharaID) {
         case '007': for (let r = 0; r < ROWS; r++) for (const c of CASTORICE_COLS) { if (b[r][c] === me) x -= 3; else if (b[r][c] === op) x += 3; } return x;
         case '011': for (let c = 0; c < COLS; c++) if (b[4][c] === op) x += 5; return x;
     }
-    return 0;
+    return extraCharaBonus(b, me, charaID);
 }
 function evaluate(b, me, charaID, oppCharaID) {
     let s = 0;
+    const w = styleWeights(charaID);
     for (let r = 0; r < ROWS; r++) { if (b[r][3] === me) s += 3; else if (b[r][3]) s -= 3; }
-    for (let r = 0; r < ROWS; r++) for (let c = 0; c <= COLS - 4; c++) s += scoreWindow(b[r][c], b[r][c + 1], b[r][c + 2], b[r][c + 3], me);
-    for (let c = 0; c < COLS; c++) for (let r = 0; r <= ROWS - 4; r++) s += scoreWindow(b[r][c], b[r + 1][c], b[r + 2][c], b[r + 3][c], me);
-    for (let r = 0; r <= ROWS - 4; r++) for (let c = 0; c <= COLS - 4; c++) s += scoreWindow(b[r][c], b[r + 1][c + 1], b[r + 2][c + 2], b[r + 3][c + 3], me);
-    for (let r = 0; r <= ROWS - 4; r++) for (let c = 3; c < COLS; c++) s += scoreWindow(b[r][c], b[r + 1][c - 1], b[r + 2][c - 2], b[r + 3][c - 3], me);
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c <= COLS - 4; c++) s += scoreWindow(b[r][c], b[r][c + 1], b[r][c + 2], b[r][c + 3], me, w);
+    for (let c = 0; c < COLS; c++) for (let r = 0; r <= ROWS - 4; r++) s += scoreWindow(b[r][c], b[r + 1][c], b[r + 2][c], b[r + 3][c], me, w);
+    for (let r = 0; r <= ROWS - 4; r++) for (let c = 0; c <= COLS - 4; c++) s += scoreWindow(b[r][c], b[r + 1][c + 1], b[r + 2][c + 2], b[r + 3][c + 3], me, w);
+    for (let r = 0; r <= ROWS - 4; r++) for (let c = 3; c < COLS; c++) s += scoreWindow(b[r][c], b[r + 1][c - 1], b[r + 2][c - 2], b[r + 3][c - 3], me, w);
     return s + characterBonus(b, me, charaID, oppCharaID);
 }
 const ORDER = [3, 2, 4, 1, 5, 0, 6];
@@ -639,7 +718,9 @@ export function cpuChooseCol(st, side, profile, plan = {}) {
     const swapped = st.changeStone > 0;
     const put = swapped ? op : me;
     // 読み間違い(人間らしい凡ミス): すぐ勝てる時は見逃さない。相手にすぐ勝たせる手はなるべく避ける
-    if (profile.mistake > 0 && rand(st) < profile.mistake && (swapped || !playable.some((c) => wouldWinCol(st.stones, c, me)))) {
+    // 気まぐれなキャラ(アベンチュリン)は読み間違いの確率が2倍(2026-11-03)
+    const mistake = WHIMSICAL_CHARAS.includes(st.chara[side]) ? Math.min(0.8, profile.mistake * 2) : profile.mistake;
+    if (mistake > 0 && rand(st) < mistake && (swapped || !playable.some((c) => wouldWinCol(st.stones, c, me)))) {
         const after = (c) => { const r = dropRowOf(st.stones, c); return { ...st.stones, [key(c, r)]: put }; };
         const noLine = playable.filter((c) => !hasLineOf(boardOf(after(c)), op)); // 相手の4つ並びをその場で完成させない
         const safe = noLine.filter((c) => !threatIn(after(c), op));
