@@ -70,16 +70,20 @@ function ratingAfter(rating, matchCount, cpuRating, result, resultType) {
   return Math.max(RATING_FLOOR, Math.round(rating + delta));
 }
 
-// ユーザー更新の中身(勝てば charaWins も増やす)。cpuMatch は消す
+// ユーザー更新の中身(勝てば charaWins、負ければ charaLosses を増やす。引き分けはどちらも増やさない)。cpuMatch は消す
 function userUpdate(u, m, result, newRating) {
   const won = result === 'player';
   const charaWins = { ...(u.charaWins || {}) };
   if (won) charaWins[m.playerCharaId] = (charaWins[m.playerCharaId] || 0) + 1;
+  // キャラごとの負け数(2026-11-03、10_connect の設定画面「戦績」タブで表示)
+  const charaLosses = { ...(u.charaLosses || {}) };
+  if (result === 'cpu' && m.playerCharaId) charaLosses[m.playerCharaId] = (charaLosses[m.playerCharaId] || 0) + 1;
   return {
     rating: newRating,
     matchCount: (u.matchCount || 0) + 1,
     winCount: (u.winCount || 0) + (won ? 1 : 0),
     charaWins,
+    charaLosses,
     lastMatchAt: admin.firestore.FieldValue.serverTimestamp(),
     cpuMatch: admin.firestore.FieldValue.delete(),
   };

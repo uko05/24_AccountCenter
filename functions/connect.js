@@ -139,6 +139,7 @@ exports.connectRateMatch = onDocumentUpdated('connectRooms/{roomId}', async (eve
       p2After = winnerUid === p1 ? loserNew : winnerNew;
 
       const winnerCharaId = winnerUid === p1 ? p1CharaId : p2CharaId;
+      const loserCharaId = winnerUid === p1 ? p2CharaId : p1CharaId;
       const serverNow = admin.firestore.FieldValue.serverTimestamp();
       const userUpdate = (u, uid, after) => ({
         rating: after,
@@ -147,6 +148,10 @@ exports.connectRateMatch = onDocumentUpdated('connectRooms/{roomId}', async (eve
         charaWins: uid === winnerUid
           ? { ...(u.charaWins || {}), [winnerCharaId]: ((u.charaWins || {})[winnerCharaId] || 0) + 1 }
           : (u.charaWins || {}),
+        // キャラごとの負け数(2026-11-03、10_connect の設定画面「戦績」タブで表示)
+        charaLosses: uid !== winnerUid && loserCharaId
+          ? { ...(u.charaLosses || {}), [loserCharaId]: ((u.charaLosses || {})[loserCharaId] || 0) + 1 }
+          : (u.charaLosses || {}),
         lastMatchAt: serverNow,
       });
       tx.set(p1Ref, userUpdate(u1, p1, p1After), { merge: true });
