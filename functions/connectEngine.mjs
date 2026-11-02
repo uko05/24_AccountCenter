@@ -23,7 +23,7 @@ const CASTORICE_COLS = [0, 1, 5, 6];
 
 // キャラの決まり(characterData.js と同じ値。サーバーはクライアントの申告ではなくこの表を使う)
 export const CHARA_RULES = {
-    '001': { charge: 14, turn: 10 }, '002': { charge: 15, turn: 6 }, '003': { charge: 11, turn: 10 },
+    '001': { charge: 14, turn: 10 }, '002': { charge: 15, turn: 6 }, '003': { charge: 12, turn: 10 },
     '004': { charge: 10, turn: 1 }, '005': { charge: 10, turn: 1 }, '006': { charge: 10, turn: 1 },
     '007': { charge: 16, turn: 6 }, '008': { charge: 12, turn: 6 }, '009': { charge: 17, turn: 5 },
     '010': { charge: 9, turn: 18 }, '011': { charge: 9, turn: 10 }, '012': { charge: 15, turn: 5 },
