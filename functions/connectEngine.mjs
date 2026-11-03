@@ -29,7 +29,7 @@ export const CHARA_RULES = {
     '010': { charge: 9, turn: 18 }, '011': { charge: 10, turn: 10 }, '012': { charge: 16, turn: 5 },
     '013': { charge: 14, turn: 1 }, '014': { charge: 15, turn: 8 }, '015': { charge: 16, turn: 1 },
     '016': { charge: 8, turn: 1 }, '017': { charge: 18, turn: 1 }, '018': { charge: 16, turn: 6 },
-    '019': { charge: 14, turn: 6 }, '020': { charge: 15, turn: 8 },
+    '019': { charge: 14, turn: 6 }, '020': { charge: 14, turn: 8 },
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -630,7 +630,7 @@ function ultCondition(st, side, charaID, plan) {
     const me = colorOf(st, side), op = otherColor(me), S = st.stones;
     const opThreat = () => threatIn(S, op);
     switch (charaID) {
-        case '020': { const sim = gravityFlipStones(S).stones; const b = boardOf(sim); if (hasLineOf(b, op)) return false; if (hasLineOf(b, me)) return true; return opThreat() && !threatIn(sim, op); }
+        case '020': { const sim = gravityFlipStones(S).stones; const b = boardOf(sim); if (hasLineOf(b, op)) return false; if (hasLineOf(b, me)) return true; if (threatIn(sim, op)) return false; return opThreat() || threatIn(sim, me); }
         case '018': {
             const t = bestBombTargets(S, op)[0]; if (!t) return false;
             return bombValue(S, t, op) >= 3;
