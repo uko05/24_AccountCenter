@@ -171,3 +171,8 @@ Object.assign(exports, require('./arcanaTrade'));
 // うーこオークションの期限切れ出品の精算(詳細は auctionSettle.js 冒頭)
 Object.assign(exports, require('./auctionSettle'));
 
+// UP宝くじ(毎月1日・16日の22時に抽選、1時間ごとに集計。詳細は lottery.js 冒頭)
+const lottery = require('./lottery');
+exports.lotteryDraw = lottery.lotteryDraw;
+exports.lotteryTick = lottery.lotteryTick;
+

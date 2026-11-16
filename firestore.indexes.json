@@ -25,6 +25,14 @@
       ]
     },
     {
+      "collectionGroup": "ukoLotteryEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "drawId", "order": "ASCENDING" },
+        { "fieldPath": "count", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "friendBoardPosts",
       "queryScope": "COLLECTION",
       "fields": [

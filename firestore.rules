@@ -168,6 +168,47 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ===== UP宝くじ(2026-11-17。詳細は functions/lottery.js 冒頭) =====
+    // 回(抽選日ごと)。書くのは Cloud Functions(lottery.js)だけ
+    match /ukoLottery/{drawId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    // 抽選から外すアカウント(サブ垢など)。管理者だけが書く
+    match /ukoLotteryConfig/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    // 1人1回分の口数(08_UPoint で購入)。ID は「回_ユーザー」。口数は増やすだけ・200口まで・受付中の回だけ。
+    // 増やした口数×10UP が、同じトランザクションで omikujiUsers.ukoPoints から減っていることを確かめる
+    // (払わずに口数だけ増やす、を防ぐ)
+    function lotteryDrawOpen(drawId) {
+      return exists(/databases/$(database)/documents/ukoLottery/$(drawId))
+        && get(/databases/$(database)/documents/ukoLottery/$(drawId)).data.status == 'open'
+        && request.time < get(/databases/$(database)/documents/ukoLottery/$(drawId)).data.closeAt;
+    }
+    function lotteryPaid(userId, added) {
+      return getAfter(/databases/$(database)/documents/omikujiUsers/$(userId)).data.ukoPoints
+        == get(/databases/$(database)/documents/omikujiUsers/$(userId)).data.ukoPoints - 10 * added;
+    }
+    match /ukoLotteryEntries/{entryId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['drawId', 'userId', 'name', 'count', 'updatedAt'])
+        && entryId == request.resource.data.drawId + '_' + request.resource.data.userId
+        && request.resource.data.count is int
+        && request.resource.data.count >= 1 && request.resource.data.count <= 200
+        && lotteryDrawOpen(request.resource.data.drawId)
+        && lotteryPaid(request.resource.data.userId, request.resource.data.count);
+      allow update: if request.resource.data.keys().hasOnly(['drawId', 'userId', 'name', 'count', 'updatedAt'])
+        && request.resource.data.drawId == resource.data.drawId
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.count is int
+        && request.resource.data.count > resource.data.count && request.resource.data.count <= 200
+        && lotteryDrawOpen(request.resource.data.drawId)
+        && lotteryPaid(request.resource.data.userId, request.resource.data.count - resource.data.count);
+      allow delete: if false;
+    }
+
     // AccountCenter 機種変申請（未登録ユーザーでも送信できるよう作成は誰でも可。
     // 閲覧・処理(更新)・却下(更新)・削除は管理者のみ）
     match /mergeRequests/{requestId} {
