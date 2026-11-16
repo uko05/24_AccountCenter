@@ -7,6 +7,7 @@
 //  - 当たり: 1等1人(合計の60% + 願いの結晶2個) / 2等2人(15%ずつ + 結晶1個) / 3等5人(2%ずつ)
 //    売れた口数に比例した確率で、1人1つまで(上の等から順に引く)。
 //  - 抽選は毎月1日と16日。販売は21時まで、22時に抽選して結果を書き、当選者へメールを送る(受け取りボタンで加算)。
+//  - 参加者が8人以下なら抽選せず、口数も賞金もそのまま次の回へ持ち越す(status 'carried'。2026-11-17)。
 //
 // データ:
 //  ukoLottery/{drawId}          drawId = 'YYYY-MM-DD'(抽選日、日本時間)。closeAt / resultAt / seed / totalTickets /
@@ -31,6 +32,7 @@ const TIERS = [   // 上から順に引く
   { tier: 3, count: 5, share: 0.02, crystals: 0 },
 ];
 const MAIL_DAYS = 30;
+const MIN_PEOPLE = 9;   // 抽選する最低人数。8人以下(当たりの数以下)なら次の回へ持ち越す
 
 // ── 日付(日本時間)
 function jstParts(ms) {
@@ -92,12 +94,45 @@ function pickWeighted(pool) {
   return pool.length - 1;
 }
 
+// 持ち越し: この回を 'carried' にし、次の回へ賞金(この回の賞金の合計がそのまま次の回の最低保証になる)と
+// 各自の口数を引き継ぐ。参加した人には「持ち越しになった」メールを1通(報酬なし)
+async function carryOver(db, ref, drawId, entries, totalTickets, pool, afterMs) {
+  const nowMs = Date.now();
+  const next = await ensureDraw(db, afterMs, 0);   // この回の発表より後の回
+  const nextSnap = await next.ref.get();
+  const nextSeed = nextSnap.data().seed || SEED;
+  const batch = db.batch();
+  batch.update(ref, {
+    status: 'carried', carriedTo: next.drawId, totalTickets, participants: entries.length, pool, winners: [],
+    drawnAt: FV.serverTimestamp(), updatedAt: FV.serverTimestamp(),
+  });
+  // 次の回の最低保証 = この回の賞金の合計(次の回にもともと上乗せされていた分があれば、それも足す)
+  const seed = pool + (nextSeed - SEED);
+  batch.update(next.ref, { seed, pool: FV.increment(seed - nextSeed), carriedFrom: drawId, updatedAt: FV.serverTimestamp() });
+  for (const e of entries) {
+    batch.set(db.collection('ukoLotteryEntries').doc(`${next.drawId}_${e.userId}`), {
+      drawId: next.drawId, userId: e.userId, name: e.name || '', count: FV.increment(e.count), updatedAt: FV.serverTimestamp(),
+    }, { merge: true });
+  }
+  if (entries.length) {
+    batch.set(db.collection('omikujiMailBroadcasts').doc(), {
+      title: 'UP宝くじ 持ち越しのお知らせ',
+      message: `${drawId.replace(/-/g, '/')} のUP宝くじは参加者が${MIN_PEOPLE}人に届かなかったため、抽選を次の回（${next.drawId.replace(/-/g, '/')}）へ持ち越しました。\n買った口数と賞金はそのまま次の回に引き継がれます。`,
+      rewards: [], target: { type: 'users', userIds: entries.map((e) => e.userId) },
+      expiresAt: admin.firestore.Timestamp.fromMillis(nowMs + MAIL_DAYS * 86400e3), createdAt: FV.serverTimestamp(),
+      kind: 'lottery', drawId,
+    });
+  }
+  await batch.commit();
+  return { drawId, carried: true, to: next.drawId, totalTickets, participants: entries.length, pool };
+}
+
 async function runDraw(db, drawId) {
   const ref = db.collection('ukoLottery').doc(drawId);
   const snap = await ref.get();
   if (!snap.exists) return null;
   const draw = snap.data();
-  if (draw.status === 'drawn') return null;
+  if (draw.status === 'drawn' || draw.status === 'carried') return null;
 
   const [entriesSnap, cfgSnap] = await Promise.all([
     db.collection('ukoLotteryEntries').where('drawId', '==', drawId).get(),
@@ -108,6 +143,11 @@ async function runDraw(db, drawId) {
   const totalTickets = entries.reduce((a, e) => a + e.count, 0);
   const pool = (draw.seed || SEED) + PER_TICKET_POOL * totalTickets;
   let box = entries.filter((e) => !excluded.has(e.userId)).map((e) => ({ ...e }));
+
+  // 参加者が8人以下なら抽選しない(全員が何かに当たってしまうため)。口数も賞金もそのまま次の回へ持ち越す(2026-11-17)
+  // 次の回は「この回の発表時刻より後」で決める(遅れて動いた時も、早く動いた時も同じ回を指すように)
+  const afterMs = Math.max(Date.now(), draw.resultAt ? draw.resultAt.toMillis() : 0) + 60e3;
+  if (box.length < MIN_PEOPLE) return carryOver(db, ref, drawId, entries, totalTickets, pool, afterMs);
 
   const winners = [];
   let leftover = 0;
@@ -146,7 +186,7 @@ async function runDraw(db, drawId) {
   }
   await batch.commit();
   // 次の回を作る(余った分を最低保証に上乗せ)
-  await ensureDraw(db, nowMs + 60e3, leftover);
+  await ensureDraw(db, afterMs, leftover);
   return { drawId, totalTickets, participants: entries.length, pool, winners: winners.length, leftover };
 }
 
