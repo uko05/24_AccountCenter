@@ -32,6 +32,7 @@ const TIERS = [   // 上から順に引く
   { tier: 3, count: 5, share: 0.02, crystals: 0 },
 ];
 const MAIL_DAYS = 30;
+const REMIND_HOURS = [24, 5, 1];   // 締め切りの何時間前に「購入締め切りまであと○時間！」を流すか
 const MIN_PEOPLE = 9;   // 抽選する最低人数。8人以下(当たりの数以下)なら次の回へ持ち越す
 
 // ── 日付(日本時間)
@@ -307,6 +308,16 @@ exports.lotteryTick = onSchedule({ schedule: '0 * * * *', timeZone: TZ, region: 
   }
   if (nowMs >= cur.closeMs) return;   // 締め切り後は数字を動かさない(抽選で確定させる)
   const { total, n } = await aggregate(db, cur.drawId);
-  await cur.ref.update({ totalTickets: total, participants: n, pool: (dd.seed || SEED) + PER_TICKET_POOL * total, updatedAt: FV.serverTimestamp() });
+  const pool = (dd.seed || SEED) + PER_TICKET_POOL * total;
+  const upd = { totalTickets: total, participants: n, pool, updatedAt: FV.serverTimestamp() };
+  // 締め切りの24時間前・5時間前・1時間前に「購入締め切りまであと○時間！」をフィードに1件ずつ(2026-11-18)。
+  // 処理が遅れて2つまとめて当てはまった時は、近い方(時間の短い方)だけ出す
+  const due = REMIND_HOURS.filter((h) => nowMs >= cur.closeMs - h * 3600e3 && !(dd.reminded || []).includes(h));
+  if (due.length) {
+    const h = Math.min(...due);
+    upd.reminded = FV.arrayUnion(...due);
+    await db.collection('omikujiFeed').add(feedPost({ kind: 'remind', drawId: cur.drawId, hours: h, closeMs: cur.closeMs, pool, totalTickets: total, participants: n }));
+  }
+  await cur.ref.update(upd);
 });
 
