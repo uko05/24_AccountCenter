@@ -44,8 +44,28 @@ const drawIdOf = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
 // 日本時間の y/m/d h:00 のミリ秒
 const jstMs = (y, m, d, h) => Date.UTC(y, m - 1, d, h - 9, 0, 0);
 
+// ── 試しの期間(2026-11-17)。ukoLotteryConfig/main に testUntil(Timestamp) と testIntervalMin(分) があれば、
+// その時刻まで「testIntervalMin 分ごと」に回を作る(回の名前は T + 発表時刻、締め切りは発表の5分前)。
+// testBotIds(試し用アカウント)には、回を作るたびに自動でランダムな口数を買わせる(9人以上そろえるため)。
+// 試しの回の持ち越し・余りは、本番の回には持ち込まない。
+let CFG = {};
+async function loadCfg(db) {
+  const snap = await db.collection('ukoLotteryConfig').doc('main').get();
+  CFG = snap.exists ? snap.data() : {};
+  return CFG;
+}
+const testActive = (ms) => !!(CFG.testUntil && CFG.testUntil.toMillis() > ms && CFG.testIntervalMin > 0);
+const isTestId = (id) => String(id).startsWith('T');
+
 // 今受け付けている回(結果発表の時刻がまだ来ていない一番近い回)
 function currentDraw(nowMs) {
+  if (testActive(nowMs)) {
+    const iv = CFG.testIntervalMin * 60e3;
+    const res = Math.floor(nowMs / iv) * iv + iv;
+    const j = new Date(res + 9 * 3600e3);
+    const id = `T${j.getUTCFullYear()}${pad(j.getUTCMonth() + 1)}${pad(j.getUTCDate())}-${pad(j.getUTCHours())}${pad(j.getUTCMinutes())}`;
+    return { drawId: id, closeMs: res - 5 * 60e3, resultMs: res };
+  }
   let { y, m } = jstParts(nowMs);
   for (let k = 0; k < 3; k++) {
     for (const day of [1, 16]) {
@@ -70,9 +90,29 @@ async function ensureDraw(db, nowMs, carry = 0) {
       resultAt: admin.firestore.Timestamp.fromMillis(cd.resultMs),
       seed: SEED + carry, totalTickets: 0, participants: 0, pool: SEED + carry,
       status: 'open', winners: [], createdAt: FV.serverTimestamp(), updatedAt: FV.serverTimestamp(),
+      ...(isTestId(cd.drawId) ? { test: true } : {}),
     });
+    if (isTestId(cd.drawId)) await botsBuy(db, cd.drawId);
   }
   return { ref, ...cd };
+}
+
+// 試し用アカウントに、ランダムな口数(1〜60口)を買わせる。UPも減らして記録も残す(本物の購入と同じ形)
+async function botsBuy(db, drawId) {
+  const bots = CFG.testBotIds || [];
+  if (!bots.length) return;
+  const batch = db.batch();
+  for (const uid of bots) {
+    const n = crypto.randomInt(1, 61);
+    batch.set(db.collection('omikujiUsers').doc(uid), { ukoPoints: FV.increment(-10 * n) }, { merge: true });
+    batch.set(db.collection('ukoLotteryEntries').doc(`${drawId}_${uid}`), {
+      drawId, userId: uid, name: `試し${uid.slice(-2)}`, count: FV.increment(n), updatedAt: FV.serverTimestamp(),
+    }, { merge: true });
+    batch.set(db.collection('ukoPointsLog').doc(), {
+      userId: uid, amount: -10 * n, type: 'lotteryBuy', meta: { drawId, qty: n, test: true }, createdAt: FV.serverTimestamp(),
+    });
+  }
+  await batch.commit();
 }
 
 // 口数と賞金の集計(集計クエリなので、読み取りは参加者の数ではなく 1000件ごとに1回分)
@@ -98,6 +138,11 @@ function pickWeighted(pool) {
 // 各自の口数を引き継ぐ。参加した人には「持ち越しになった」メールを1通(報酬なし)
 async function carryOver(db, ref, drawId, entries, totalTickets, pool, afterMs) {
   const nowMs = Date.now();
+  if (isTestId(drawId) && !isTestId(currentDraw(afterMs).drawId)) {
+    // 試しの期間の最後の回: 本番の回には持ち込まず、終わりにする
+    await ref.update({ status: 'carried', carriedTo: '', totalTickets, participants: entries.length, pool, winners: [], drawnAt: FV.serverTimestamp(), updatedAt: FV.serverTimestamp() });
+    return { drawId, carried: true, to: null };
+  }
   const next = await ensureDraw(db, afterMs, 0);   // この回の発表より後の回
   const nextSnap = await next.ref.get();
   const nextSeed = nextSnap.data().seed || SEED;
@@ -186,13 +231,16 @@ async function runDraw(db, drawId) {
   }
   await batch.commit();
   // 次の回を作る(余った分を最低保証に上乗せ)
-  await ensureDraw(db, afterMs, leftover);
+  // 余りは次の回の最低保証へ(試しの回の余りは本番の回には持ち込まない)
+  const nextIsTest = isTestId(currentDraw(afterMs).drawId);
+  await ensureDraw(db, afterMs, isTestId(drawId) && !nextIsTest ? 0 : leftover);
   return { drawId, totalTickets, participants: entries.length, pool, winners: winners.length, leftover };
 }
 
 // 毎月1日・16日の22時に抽選
 exports.lotteryDraw = onSchedule({ schedule: '0 22 1,16 * *', timeZone: TZ, region: 'asia-northeast1', timeoutSeconds: 300 }, async () => {
   const db = admin.firestore();
+  await loadCfg(db);
   const { y, m, d } = jstParts(Date.now());
   const res = await runDraw(db, drawIdOf(y, m, d));
   console.log('[lottery] draw', JSON.stringify(res));
@@ -200,8 +248,10 @@ exports.lotteryDraw = onSchedule({ schedule: '0 22 1,16 * *', timeZone: TZ, regi
 
 // 1時間ごと: 今の回のドキュメントを用意し、口数と賞金を集計して書く。
 // 抽選が走り損ねた回(結果発表を過ぎても open のまま)があれば、ここで抽選する
-exports.lotteryTick = onSchedule({ schedule: '7 * * * *', timeZone: TZ, region: 'asia-northeast1', timeoutSeconds: 300 }, async () => {
+// 2026-11-17: 試しの期間(30分ごとの回)に合わせて5分ごとに動かす。試しの回の抽選も、ここ(発表時刻を過ぎた回)で行う
+exports.lotteryTick = onSchedule({ schedule: '*/5 * * * *', timeZone: TZ, region: 'asia-northeast1', timeoutSeconds: 300 }, async () => {
   const db = admin.firestore();
+  await loadCfg(db);
   const nowMs = Date.now();
   // 回の数は少ない(月2件)ので、status だけで絞って時刻はここで比べる(複合索引を作らない)
   const open = await db.collection('ukoLottery').where('status', '==', 'open').get();
