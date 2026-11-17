@@ -115,6 +115,22 @@ async function botsBuy(db, drawId) {
   await batch.commit();
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// フィード(結果タブ)への宝くじの投稿。公開前(ukoLotteryConfig/main の public が true でない間)は管理者だけに見える
+function feedPost(extra) {
+  return { type: 'lottery', userId: 'system_lottery', name: 'UP宝くじ', likeCount: 0, adminOnly: CFG.public !== true, createdAt: FV.serverTimestamp(), ...extra };
+}
+
+// 抽選を始める前に、この回を「抽選中」にする(定時の抽選と5分ごとの処理が同時に動いても、二重に抽選しないように)
+async function claimDraw(db, ref) {
+  return db.runTransaction(async (tx) => {
+    const s = await tx.get(ref);
+    if (!s.exists || s.data().status !== 'open') return false;
+    tx.update(ref, { status: 'drawing', updatedAt: FV.serverTimestamp() });
+    return true;
+  });
+}
+
 // 口数と賞金の集計(集計クエリなので、読み取りは参加者の数ではなく 1000件ごとに1回分)
 async function aggregate(db, drawId) {
   const q = db.collection('ukoLotteryEntries').where('drawId', '==', drawId);
@@ -159,6 +175,7 @@ async function carryOver(db, ref, drawId, entries, totalTickets, pool, afterMs) 
       drawId: next.drawId, userId: e.userId, name: e.name || '', count: FV.increment(e.count), updatedAt: FV.serverTimestamp(),
     }, { merge: true });
   }
+  batch.set(db.collection('omikujiFeed').doc(), feedPost({ kind: 'carried', drawId, to: next.drawId, pool, totalTickets, participants: entries.length }));
   if (entries.length) {
     batch.set(db.collection('omikujiMailBroadcasts').doc(), {
       title: 'UP宝くじ 持ち越しのお知らせ',
@@ -177,7 +194,8 @@ async function runDraw(db, drawId) {
   const snap = await ref.get();
   if (!snap.exists) return null;
   const draw = snap.data();
-  if (draw.status === 'drawn' || draw.status === 'carried') return null;
+  if (draw.status !== 'open') return null;
+  if (!(await claimDraw(db, ref))) return null;
 
   const [entriesSnap, cfgSnap] = await Promise.all([
     db.collection('ukoLotteryEntries').where('drawId', '==', drawId).get(),
@@ -207,41 +225,47 @@ async function runDraw(db, drawId) {
   }
 
   const nowMs = Date.now();
+  // 結果を記録(宝くじタブの「前回の結果」は revealedAt が付くまで出さない)
   const batch = db.batch();
   batch.update(ref, {
     status: 'drawn', totalTickets, participants: entries.length, pool, winners, leftover,
     drawnAt: FV.serverTimestamp(), updatedAt: FV.serverTimestamp(),
   });
-  // 当選者へメール(受け取りボタンでUP・結晶が入る)。等ごとに中身が違うので1人1通
-  const expiresAt = admin.firestore.Timestamp.fromMillis(nowMs + MAIL_DAYS * 86400e3);
   for (const w of winners) {
-    const rewards = [{ field: 'ukoPoints', amount: w.amount }];
-    if (w.crystals) rewards.push({ field: 'sitePerks.omikuji.wishCrystals', amount: w.crystals });
-    batch.set(db.collection('omikujiMailBroadcasts').doc(), {
-      title: `UP宝くじ ${w.tier}等 当選`,
-      message: `${drawId.replace(/-/g, '/')} のUP宝くじで${w.tier}等に当選しました。\n賞金 ${w.amount.toLocaleString('ja-JP')}UP${w.crystals ? `・願いの結晶 ${w.crystals}個` : ''}\n（購入 ${w.tickets}口・全体 ${totalTickets}口）`,
-      rewards, target: { type: 'users', userIds: [w.userId] }, expiresAt, createdAt: FV.serverTimestamp(),
-      kind: 'lottery', drawId,
-    });
     batch.set(db.collection('ukoPointsLog').doc(), {
       userId: w.userId, amount: w.amount, type: 'lotteryWin',
       meta: { drawId, tier: w.tier, tickets: w.tickets, crystals: w.crystals, viaMail: true },
       createdAt: FV.serverTimestamp(),
     });
   }
-  // フィードの「結果」タブに、結果のまとめを1件投稿(2026-11-17)。公開前(ukoLotteryConfig/main の public が true でない間)は管理者だけに見える
-  const w1 = winners.find((w) => w.tier === 1);
-  batch.set(db.collection('omikujiFeed').doc(), {
-    type: 'lottery', drawId, userId: 'system_lottery', name: 'UP宝くじ', likeCount: 0,
-    first: w1 ? { name: w1.name || '', amount: w1.amount, crystals: w1.crystals } : null,
-    seconds: winners.filter((w) => w.tier === 2).map((w) => w.name || ''),
-    thirdCount: winners.filter((w) => w.tier === 3).length,
-    totalTickets, participants: entries.length, adminOnly: CFG.public !== true,
-    createdAt: FV.serverTimestamp(),
-  });
   await batch.commit();
-  // 次の回を作る(余った分を最低保証に上乗せ)
-  // 余りは次の回の最低保証へ(試しの回の余りは本番の回には持ち込まない)
+
+  // フィードで順番に発表(2026-11-17): 3等(1人1件)→10秒後に2等→10秒後に1等。公開前は管理者だけ(adminOnly)
+  for (const tier of [3, 2, 1]) {
+    if (tier !== 3) await sleep(10e3);
+    const b = db.batch();
+    winners.filter((w) => w.tier === tier).forEach((w) => b.set(db.collection('omikujiFeed').doc(), feedPost({
+      kind: 'win', drawId, tier, winnerName: w.name || '', amount: w.amount, crystals: w.crystals,
+    })));
+    await b.commit();
+  }
+
+  // 発表を出し終えてから、宝くじタブに結果を出し、当選者へメール(受け取りボタンでUP・結晶が入る)
+  const expiresAt = admin.firestore.Timestamp.fromMillis(nowMs + MAIL_DAYS * 86400e3);
+  const mb = db.batch();
+  mb.update(ref, { revealedAt: FV.serverTimestamp() });
+  for (const w of winners) {
+    const rewards = [{ field: 'ukoPoints', amount: w.amount }];
+    if (w.crystals) rewards.push({ field: 'sitePerks.omikuji.wishCrystals', amount: w.crystals });
+    mb.set(db.collection('omikujiMailBroadcasts').doc(), {
+      title: `UP宝くじ ${w.tier}等 当選`,
+      message: `${drawId.replace(/-/g, '/')} のUP宝くじで${w.tier}等に当選しました。\n賞金 ${w.amount.toLocaleString('ja-JP')}UP${w.crystals ? `・願いの結晶 ${w.crystals}個` : ''}\n（購入 ${w.tickets}口・全体 ${totalTickets}口）`,
+      rewards, target: { type: 'users', userIds: [w.userId] }, expiresAt, createdAt: FV.serverTimestamp(),
+      kind: 'lottery', drawId,
+    });
+  }
+  await mb.commit();
+  // 次の回を作る。余りは次の回の最低保証へ(試しの回の余りは本番の回には持ち込まない)
   const nextIsTest = isTestId(currentDraw(afterMs).drawId);
   await ensureDraw(db, afterMs, isTestId(drawId) && !nextIsTest ? 0 : leftover);
   return { drawId, totalTickets, participants: entries.length, pool, winners: winners.length, leftover };
@@ -271,10 +295,18 @@ exports.lotteryTick = onSchedule({ schedule: '*/5 * * * *', timeZone: TZ, region
     console.log('[lottery] late draw', JSON.stringify(res));
   }
   const cur = await ensureDraw(db, nowMs);
-  if (nowMs >= cur.closeMs + 5 * 60e3) return;   // 締め切り後は数字を動かさない(抽選で確定させる)
-  const { total, n } = await aggregate(db, cur.drawId);
   const snap = await cur.ref.get();
-  const seed = snap.data().seed || SEED;
-  await cur.ref.update({ totalTickets: total, participants: n, pool: seed + PER_TICKET_POOL * total, updatedAt: FV.serverTimestamp() });
+  const dd = snap.data();
+  // 締め切り(本番は発表の1時間前、試しは5分前)を過ぎたら、最終の数字で「まもなく発表」をフィードに1件(2026-11-17)
+  if (nowMs >= cur.closeMs && dd.status === 'open' && !dd.preAnnounced) {
+    const { total, n } = await aggregate(db, cur.drawId);
+    const pool = (dd.seed || SEED) + PER_TICKET_POOL * total;
+    await cur.ref.update({ totalTickets: total, participants: n, pool, preAnnounced: true, updatedAt: FV.serverTimestamp() });
+    await db.collection('omikujiFeed').add(feedPost({ kind: 'pre', drawId: cur.drawId, resultMs: cur.resultMs, pool, totalTickets: total, participants: n, enough: n >= MIN_PEOPLE }));
+    return;
+  }
+  if (nowMs >= cur.closeMs) return;   // 締め切り後は数字を動かさない(抽選で確定させる)
+  const { total, n } = await aggregate(db, cur.drawId);
+  await cur.ref.update({ totalTickets: total, participants: n, pool: (dd.seed || SEED) + PER_TICKET_POOL * total, updatedAt: FV.serverTimestamp() });
 });
 
