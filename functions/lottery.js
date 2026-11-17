@@ -229,6 +229,16 @@ async function runDraw(db, drawId) {
       createdAt: FV.serverTimestamp(),
     });
   }
+  // フィードの「結果」タブに、結果のまとめを1件投稿(2026-11-17)。公開前(ukoLotteryConfig/main の public が true でない間)は管理者だけに見える
+  const w1 = winners.find((w) => w.tier === 1);
+  batch.set(db.collection('omikujiFeed').doc(), {
+    type: 'lottery', drawId, userId: 'system_lottery', name: 'UP宝くじ', likeCount: 0,
+    first: w1 ? { name: w1.name || '', amount: w1.amount, crystals: w1.crystals } : null,
+    seconds: winners.filter((w) => w.tier === 2).map((w) => w.name || ''),
+    thirdCount: winners.filter((w) => w.tier === 3).length,
+    totalTickets, participants: entries.length, adminOnly: CFG.public !== true,
+    createdAt: FV.serverTimestamp(),
+  });
   await batch.commit();
   // 次の回を作る(余った分を最低保証に上乗せ)
   // 余りは次の回の最低保証へ(試しの回の余りは本番の回には持ち込まない)
