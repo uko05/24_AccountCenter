@@ -282,8 +282,8 @@ exports.lotteryDraw = onSchedule({ schedule: '0 22 1,16 * *', timeZone: TZ, regi
 
 // 1時間ごと: 今の回のドキュメントを用意し、口数と賞金を集計して書く。
 // 抽選が走り損ねた回(結果発表を過ぎても open のまま)があれば、ここで抽選する
-// 2026-11-17: 試しの期間(30分ごとの回)に合わせて5分ごとに動かす。試しの回の抽選も、ここ(発表時刻を過ぎた回)で行う
-exports.lotteryTick = onSchedule({ schedule: '*/5 * * * *', timeZone: TZ, region: 'asia-northeast1', timeoutSeconds: 300 }, async () => {
+// 毎時0分(21:00 の「まもなく発表」もここ)。試しの期間(testUntil を設定)に使うときは '*/5 * * * *' に戻すこと
+exports.lotteryTick = onSchedule({ schedule: '0 * * * *', timeZone: TZ, region: 'asia-northeast1', timeoutSeconds: 300 }, async () => {
   const db = admin.firestore();
   await loadCfg(db);
   const nowMs = Date.now();
