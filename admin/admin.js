@@ -2095,6 +2095,60 @@ async function renderUpEarningsBreakdown(uid, totalLikesReceived, withLikeUp = f
   }
 }
 
+// UP交換所(08_UPoint/script.js の UPOINT_ITEMS)のアイテム一覧。交換したかどうかをチェックボックスで見るだけ(2026-11-18)。
+// UP交換所にアイテムを足したら、ここにも1行足すこと(max: 生涯の上限、null は無制限)
+const UPOINT_ITEMS_FOR_ADMIN = [
+  { id: 'genshinRanking_nation_mode', name: '推しキャラランキング「国別」タブを解放', max: 1 },
+  { id: 'omikuji_achievement_display', name: 'アチーブメント表示を解放', max: 1 },
+  { id: 'omikuji_gacha_ticket', name: 'ガチャ券 ×1', max: null },
+  { id: 'omikuji_listing_like_unlock', name: 'オークション出品へのいいねを解放', max: 1 },
+  { id: 'omikuji_starrail_gacha_unlock', name: 'スタレ裏面ガチャ解放', max: 1 },
+  { id: 'omikuji_new_backs_ticker', name: '新着裏面の帯', max: 1 },
+  { id: 'omikuji_wish_crystal', name: '願いの結晶（毎月1回）', max: null, monthly: true },
+  { id: 'omikuji_like_give_boost', name: 'アゲいいねUPアップ（24時間）', max: 5 },
+  { id: 'omikuji_like_receive_boost', name: 'モラいいねUPアップ（24時間）', max: 5 },
+  { id: 'accountcenter_achievement_setting', name: 'アチーブメント設定を解放', max: 1 },
+  { id: 'accountcenter_title_regular', name: 'ゴールド称号「うーこの部屋常連」', max: 1 },
+  { id: 'accountcenter_title_up_champion', name: 'レジェンド称号「UP覇者」', max: 1 },
+  { id: 'storage17_extra_daily_upload', name: '1日のアップロード上限 ＋1枚', max: 10 },
+  { id: 'connect_aventurine_unlock', name: 'アベンチュリン解放', max: 1 },
+  { id: 'friendboard_chat_plus5', name: 'チャット送信可能数 ＋5', max: null },
+];
+
+function renderUpRedemptions(counts, monthly) {
+  const box = document.getElementById('edit-up-redemptions');
+  box.innerHTML = '';
+  const nowMonth = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 7);
+  for (const item of UPOINT_ITEMS_FOR_ADMIN) {
+    const n = counts[item.id] || 0;
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex; align-items:center; gap:6px;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = n > 0;
+    cb.disabled = true;
+    const text = document.createElement('span');
+    let note = n > 0 ? `${n}回` : '未交換';
+    if (item.max != null && item.max > 1) note += ` / 上限${item.max}`;
+    if (item.monthly) {
+      const m = monthly[item.id];
+      note += m && m.month === nowMonth && m.count > 0 ? '（今月 交換済み）' : '（今月 まだ）';
+    }
+    text.textContent = `${item.name}　${note}`;
+    if (n === 0) text.style.color = '#999';
+    row.append(cb, text);
+    box.appendChild(row);
+  }
+  const known = new Set(UPOINT_ITEMS_FOR_ADMIN.map((i) => i.id));
+  const others = Object.entries(counts).filter(([id, n]) => !known.has(id) && n > 0);
+  if (others.length) {
+    const p = document.createElement('div');
+    p.style.cssText = 'font-size:0.8rem; color:#888;';
+    p.textContent = 'その他: ' + others.map(([id, n]) => `${id} ${n}回`).join('、');
+    box.appendChild(p);
+  }
+}
+
 async function openEditor(uid, data, account = null) {
   currentEditUid = uid;
   currentEditData = data;
@@ -2126,6 +2180,7 @@ async function openEditor(uid, data, account = null) {
   document.getElementById('perk-title-up-champion').checked = !!perks.accountCenter?.titleUpChampionUnlocked;
   document.getElementById('perk-ach-display').checked = !!perks.omikuji?.achievementDisplayUnlocked;
   document.getElementById('perk-title-fate-observer').checked = !!perks.omikuji?.titleFateObserverUnlocked;
+  renderUpRedemptions(data.redemptionCounts || {}, data.monthlyRedemptions || {});
 
   const badge = data.equippedBadge;
   document.getElementById('edit-equipped-badge-display').textContent = badge
