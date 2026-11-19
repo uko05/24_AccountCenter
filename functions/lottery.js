@@ -4,7 +4,7 @@
 // しくみ(抽選箱方式):
 //  - 1口10UP。そのうち8UPが賞金に積み上がる(2UPは消える)。1人1回の抽選で200口まで。
 //  - 賞金の合計 = 最低保証3,000UP(+前回に当たりが余った分) + 売れた口数×8UP
-//  - 当たり: 1等1人(合計の60% + 願いの結晶2個) / 2等2人(15%ずつ + 結晶1個) / 3等5人(2%ずつ)
+//  - 当たり: 1等1人(合計の60%+2000UP + 願いの結晶2個) / 2等2人(15%+1000UPずつ + 結晶1個) / 3等5人(2%+500UPずつ)
 //    売れた口数に比例した確率で、1人1つまで(上の等から順に引く)。
 //  - 抽選は毎月1日と16日。販売は21時まで、22時に抽選して結果を書き、当選者へメールを送る(受け取りボタンで加算)。
 //  - 参加者が8人以下なら抽選せず、口数も賞金もそのまま次の回へ持ち越す(status 'carried'。2026-11-17)。
@@ -27,9 +27,10 @@ const TZ = 'Asia/Tokyo';
 const SEED = 3000;
 const PER_TICKET_POOL = 8;
 const TIERS = [   // 上から順に引く
-  { tier: 1, count: 1, share: 0.60, crystals: 2 },
-  { tier: 2, count: 2, share: 0.15, crystals: 1 },
-  { tier: 3, count: 5, share: 0.02, crystals: 0 },
+  // bonus: 割合とは別に、運営が上乗せする賞金(2026-11-19 ユーザーの決定。1等+2000・2等+1000・3等+500)
+  { tier: 1, count: 1, share: 0.60, bonus: 2000, crystals: 2 },
+  { tier: 2, count: 2, share: 0.15, bonus: 1000, crystals: 1 },
+  { tier: 3, count: 5, share: 0.02, bonus: 500, crystals: 0 },
 ];
 const MAIL_DAYS = 30;
 const REMIND_HOURS = [24, 5, 1];   // 締め切りの何時間前に「購入締め切りまであと○時間！」を流すか
@@ -216,10 +217,10 @@ async function runDraw(db, drawId) {
   const winners = [];
   let leftover = 0;
   for (const t of TIERS) {
-    const amount = Math.floor(pool * t.share);
+    const amount = Math.floor(pool * t.share) + (t.bonus || 0);
     for (let k = 0; k < t.count; k++) {
       const i = pickWeighted(box);
-      if (i < 0) { leftover += amount; continue; }   // 当たりが余った分は次の回の最低保証へ
+      if (i < 0) { leftover += Math.floor(pool * t.share); continue; }   // 上乗せの分は持ち越さない   // 当たりが余った分は次の回の最低保証へ
       const e = box.splice(i, 1)[0];
       winners.push({ tier: t.tier, userId: e.userId, name: e.name || '', tickets: e.count, amount, crystals: t.crystals });
     }
