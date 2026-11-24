@@ -94,6 +94,7 @@ onAuthStateChanged(auth, async (user) => {
   if (isAdmin) {
     whoamiEl.textContent = user.email;
     loadRequests();
+    loadFbImageReviews(); // 確認待ちだけを読む(件数は少ない)
     // ユーザー一覧は開いた時だけ読む(2026-10-27): 全件で約1.7万件の読み取りになるため、
     // 管理画面を開いただけでは読まない。下の accounts-details の toggle で初回だけ読み込む。
     // オークション履歴・UP取得履歴系はデフォルトで折りたたんでいるので、ここでは
@@ -302,6 +303,79 @@ function buildPagerControls(currentPage, totalPages, onChange) {
   pager.appendChild(pageLabel);
   pager.appendChild(nextBtn);
   return pager;
+}
+
+// ===== フレンド承認板 画像の確認(2026-11-24) =====
+// 25_FriendBoard の「画像保管庫の画像を公開する」で選ばれた画像(friendBoardImageReviews)のうち、
+// 確認待ち(status=='pending')のものを目視して「表示OK/表示NG」を付ける。
+// ルール側で、管理者は status/reviewedAt だけ書き換えられる。
+const fbImageReviewListEl = document.getElementById('fb-image-review-list');
+document.getElementById('reload-fb-image-review-btn')?.addEventListener('click', loadFbImageReviews);
+
+async function loadFbImageReviews() {
+  if (!fbImageReviewListEl) return;
+  fbImageReviewListEl.textContent = '読み込み中…';
+  let docs;
+  try {
+    // 複合インデックスを増やさないよう、並べ替えはブラウザ側で行う
+    const snap = await getDocs(query(collection(db, 'friendBoardImageReviews'), where('status', '==', 'pending')));
+    docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.requestedAt?.toMillis?.() || 0) - (b.requestedAt?.toMillis?.() || 0));
+  } catch (e) {
+    console.error('[admin] fb image reviews load failed', e);
+    fbImageReviewListEl.textContent = '読み込みに失敗しました。';
+    return;
+  }
+  if (!docs.length) {
+    fbImageReviewListEl.textContent = '確認待ちの画像はありません。';
+    return;
+  }
+  fbImageReviewListEl.innerHTML = '';
+  for (const r of docs) {
+    const card = document.createElement('div');
+    card.className = 'request-card';
+    card.innerHTML = `
+      <h4 data-role="name">${escapeHtml(r.userId)}</h4>
+      <div style="font-size:0.78rem; color:var(--muted);">申請日時: ${fmtTimestamp(r.requestedAt)}／共有ID: ${escapeHtml(r.userId)}</div>
+      <div style="margin:10px 0; text-align:center;">
+        <img data-role="img" src="${escapeHtml(r.viewUrl)}" alt="" style="max-width:100%; max-height:360px; border-radius:6px; cursor:zoom-in;">
+        <div data-role="missing" class="section-desc hidden" style="margin:0;">画像を読み込めません（保管庫から削除された可能性があります）。</div>
+      </div>
+      <div class="btn-row">
+        <button class="primary-btn" style="width:auto; padding:8px 16px;" data-action="approve">表示OK</button>
+        <button class="danger-btn" data-action="reject">表示NG</button>
+        <button class="secondary-btn" data-action="open">このユーザーを開く</button>
+      </div>
+    `;
+    const img = card.querySelector('[data-role="img"]');
+    img.addEventListener('click', () => openAdminLightbox(r.viewUrl));
+    img.addEventListener('error', () => {
+      img.remove();
+      card.querySelector('[data-role="missing"]').classList.remove('hidden');
+    });
+    const decide = async (status) => {
+      card.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+      try {
+        await updateDoc(doc(db, 'friendBoardImageReviews', r.id), { status, reviewedAt: serverTimestamp() });
+        card.remove();
+        if (!fbImageReviewListEl.children.length) fbImageReviewListEl.textContent = '確認待ちの画像はありません。';
+      } catch (e) {
+        console.error('[admin] fb image review update failed', e);
+        alert('更新に失敗しました。');
+        card.querySelectorAll('button').forEach((b) => { b.disabled = false; });
+      }
+    };
+    card.querySelector('[data-action="approve"]').addEventListener('click', () => decide('approved'));
+    card.querySelector('[data-action="reject"]').addEventListener('click', () => decide('rejected'));
+    card.querySelector('[data-action="open"]').addEventListener('click', () => openEditorByOmikujiId(r.userId));
+    fbImageReviewListEl.appendChild(card);
+
+    // 名前はフレンド承認板のプロフィールから(無ければ共有IDのまま)
+    getDoc(doc(db, 'friendBoardProfiles', r.userId)).then((snap) => {
+      const name = snap.exists() ? snap.data().displayName : '';
+      if (name) card.querySelector('[data-role="name"]').textContent = name;
+    }).catch(() => {});
+  }
 }
 
 // ===== 機種変申請キュー =====
