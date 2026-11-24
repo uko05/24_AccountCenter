@@ -554,6 +554,37 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // 「画像保管庫の画像を公開する」(2026-11-24追加, 25_FriendBoard/storageImage.js)。
+    // 17_storageの画像を1枚選んで募集カードに出す。表示は status == 'approved' のときだけ。
+    // - 本人(accountLinksで共有IDがuserIdに紐づくログインユーザー)は、'pending'(画像承認待ち)
+    //   でしか書けない。選べるのは自動審査(SafeSearch)に通った自分の画像だけで、
+    //   URLも保管庫側のドキュメントと一致しなければならない(他人の画像や外部URLを貼れない)。
+    // - 管理者は目視確認の結果(status/reviewedAt)だけを書き換えられる。
+    // - 読み取りは誰でも可(募集カードの表示用。中身は公開を選んだ画像のURLと状態だけ)。
+    function isOwnApprovedStorageImage(imageId) {
+      let img = get(/databases/$(database)/documents/screenshotStorageImages/$(imageId)).data;
+      return img.ownerUid == request.auth.uid
+        && img.moderationStatus == 'approved'
+        && img.viewUrl == request.resource.data.viewUrl
+        && img.thumbUrl == request.resource.data.thumbUrl;
+    }
+    match /friendBoardImageReviews/{userId} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && myOmikujiId() == userId
+        && request.resource.data.keys().hasOnly(['userId', 'authUid', 'storageImageId', 'viewUrl', 'thumbUrl', 'status', 'requestedAt'])
+        && request.resource.data.userId == userId
+        && request.resource.data.authUid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.requestedAt == request.time
+        && request.resource.data.storageImageId is string
+        && isOwnApprovedStorageImage(request.resource.data.storageImageId);
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedAt'])
+        && request.resource.data.status in ['approved', 'rejected'];
+      allow delete: if request.auth != null && myOmikujiId() == userId;
+    }
+
     // ===== 17_storage(スクショ保管庫) =====
     // ログイン必須サイト。ownerUidはFirebase Authのuidそのもの(FriendBoard等と違い
     // accountLinks経由の共有匿名IDにはしていない、17_storageは登録済みログイン
