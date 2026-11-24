@@ -4,7 +4,7 @@
 
 const { onObjectFinalized } = require('firebase-functions/v2/storage');
 const { onSchedule } = require('firebase-functions/v2/scheduler');
-const { onDocumentUpdated } = require('firebase-functions/v2/firestore');
+const { onDocumentUpdated, onDocumentWritten } = require('firebase-functions/v2/firestore');
 const { setGlobalOptions } = require('firebase-functions/v2');
 const admin = require('firebase-admin');
 const vision = require('@google-cloud/vision');
@@ -140,6 +140,7 @@ exports.sweepFlaggedImages = onSchedule('every 24 hours', async () => {
       autoRemovedReason: 'flagged_7day_sweep',
     }, { merge: true });
   }
+  await rebuildFlaggedQueue();
 });
 
 // moderationStatusが'removed'になった瞬間(SafeSearchの自動判定、7日一括削除、
@@ -153,6 +154,36 @@ exports.cleanupRemovedImage = onDocumentUpdated(`${IMAGES_COLLECTION}/{imageId}`
   if (!after.ownerUid) return;
   await deleteImageFiles(admin.storage().bucket().name, after.ownerUid, event.params.imageId);
 });
+
+// 要確認(flagged)の画像の一覧を、誰でも読める小さな記録 moderationQueue/storageFlagged に
+// 写しておく(2026-11-24)。PCの通知ツール(uko_tools/notify_image_review.py)が公開キーだけで
+// 「要確認が来たか」を見られるようにするため。中身は画像IDと要確認になった時刻だけで、
+// 画像そのものや持ち主は載せない(screenshotStorageImages自体は本人と管理者しか読めないまま)。
+// SafeSearch・管理者の公開/削除・7日一括削除・本人の削除、どの経路でもここで追従する。
+const FLAGGED_QUEUE_DOC = 'moderationQueue/storageFlagged';
+exports.trackFlaggedImages = onDocumentWritten(`${IMAGES_COLLECTION}/{imageId}`, async (event) => {
+  const before = event.data.before.exists ? event.data.before.data() : null;
+  const after = event.data.after.exists ? event.data.after.data() : null;
+  const wasFlagged = before?.moderationStatus === 'flagged';
+  const isFlagged = after?.moderationStatus === 'flagged';
+  if (wasFlagged === isFlagged) return;
+  const id = event.params.imageId;
+  const FieldValue = admin.firestore.FieldValue;
+  await admin.firestore().doc(FLAGGED_QUEUE_DOC).set({
+    flagged: { [id]: isFlagged ? (after.flaggedAt?.toMillis?.() || Date.now()) : FieldValue.delete() },
+    updatedAt: FieldValue.serverTimestamp(),
+  }, { merge: true });
+});
+
+// 上の写しを、実際の要確認の画像から作り直す(1日1回のsweepのあとと、手動で呼ぶ用)。
+// 取りこぼしやずれがあっても、ここで正しい状態に戻る。
+async function rebuildFlaggedQueue() {
+  const db = admin.firestore();
+  const snap = await db.collection(IMAGES_COLLECTION).where('moderationStatus', '==', 'flagged').get();
+  const flagged = {};
+  snap.docs.forEach((d) => { flagged[d.id] = d.data().flaggedAt?.toMillis?.() || Date.now(); });
+  await db.doc(FLAGGED_QUEUE_DOC).set({ flagged, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+}
 
 // 10_connect(コネバト)のランク戦レート計算(詳細は connect.js 冒頭)
 Object.assign(exports, require('./connect'));

@@ -585,6 +585,13 @@ service cloud.firestore {
       allow delete: if request.auth != null && myOmikujiId() == userId;
     }
 
+    // 画像保管庫の要確認(flagged)画像の写し(2026-11-24, functions/index.js の trackFlaggedImages)。
+    // PCの通知ツールが公開キーで読むため誰でも読める。中身は画像IDと時刻だけ。書き込みはCloud Functionsだけ。
+    match /moderationQueue/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ===== 17_storage(スクショ保管庫) =====
     // ログイン必須サイト。ownerUidはFirebase Authのuidそのもの(FriendBoard等と違い
     // accountLinks経由の共有匿名IDにはしていない、17_storageは登録済みログイン
