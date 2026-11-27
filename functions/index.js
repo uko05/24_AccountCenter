@@ -77,16 +77,18 @@ exports.moderateStorageUpload = onObjectFinalized(async (event) => {
     adult: safeSearch.adult, violence: safeSearch.violence, racy: safeSearch.racy,
   });
 
-  // VERY_LIKELYはどのカテゴリでも即削除(ここは緩めない)。racyも含める
-  // (万一の完全に露骨なケースの保険として)。
-  const isRemoved = adultRank >= VERY_LIKELY || violenceRank >= VERY_LIKELY || racyRank >= VERY_LIKELY;
+  // adult/violenceのVERY_LIKELYは即削除(ここは緩めない)。
+  // racyのVERY_LIKELYは即削除をやめて要確認(flagged)に回す(2026-11-28)。
+  // 女の子のぬいぐるみの写真が racy VERY_LIKELY(adult POSSIBLE)で3回続けて即削除され、
+  // 健全な画像でも起きると分かったため。露骨なものは管理者の確認で削除できる。
+  const isRemoved = adultRank >= VERY_LIKELY || violenceRank >= VERY_LIKELY;
 
   // 保留(flagged)の判定材料からracy(際どさ)は完全に外した(2026-09-09)。
   // ソシャゲ系キャラは肩出し・デコルテの衣装がデザインとして標準的で、
   // racyはLIKELY緩和後もそうした健全なイラストを大量に誤検知することが
   // 確認されたため。adult/violenceはより深刻なので引き続きPOSSIBLEの時点で
-  // 人の目を通す。racyは上のVERY_LIKELY即削除にのみ関与する。
-  const isFlagged = !isRemoved && (adultRank >= POSSIBLE || violenceRank >= POSSIBLE);
+  // 人の目を通す。racyはVERY_LIKELYの時だけ要確認にする(2026-11-28。以前は即削除)。
+  const isFlagged = !isRemoved && (adultRank >= POSSIBLE || violenceRank >= POSSIBLE || racyRank >= VERY_LIKELY);
 
   // 判定スコアはFirestore側にも残しておく(Cloud Functionsのログは日数が
   // 経つと見えなくなるため、後から管理画面で「なぜ保留/削除になったか」を
